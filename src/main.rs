@@ -1,39 +1,148 @@
-enum Kind {
-	Length,
-	Temperature,
+#![feature(iter_map_windows)]
+use std::{
+	collections::{HashMap, HashSet, VecDeque},
+	env, fmt,
+	str::FromStr,
+	sync::LazyLock,
+};
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
+enum Unit {
+	Centimeter,
+	Meter,
+	Kilometer,
+	Foot,
+	Yard,
+	Mile,
 }
 
-type ConversionFunction = fn(f64) -> f64;
-struct Unit {
-	from_base: ConversionFunction,
-	to_base: ConversionFunction,
-	kind: Kind,
-}
-
-impl Unit {
-	fn new(from_base: ConversionFunction, to_base: ConversionFunction, kind: Kind) -> Self {
-		Self { from_base, to_base, kind }
-	}
-	
-	pub fn convert_from(&self, value: f64) -> f64 {
-		(self.to_base)(value)
-	}
-	
-	pub fn convert_to(&self, value: f64) -> f64 {
-		(self.from_base)(value)
+struct ParseUnitError;
+impl FromStr for Unit {
+	type Err = ParseUnitError;
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s {
+			"m" => Ok(Unit::Meter),
+			"cm" => Ok(Unit::Centimeter),
+			"km" => Ok(Unit::Kilometer),
+			"yd" => Ok(Unit::Yard),
+			"ft" => Ok(Unit::Foot),
+			"mi" => Ok(Unit::Mile),
+			_ => Err(ParseUnitError),
+		}
 	}
 }
 
-// struct 
-fn main() {
-	// let a = Operation::Add(Value::Num(1), Value::Num(2));
-	// let b = Operation::Mul(Value::Num(3), Value::Num(4));
-	// println!("{:?}, {:?}", a, b);
-	let celcius = Unit::new(|t| t, |t| t, Kind::Temperature);
-	let fahrenheit = Unit::new(|t| (9. * t / 5.) + 32., |t| 5. * (t - 32.) / 9., Kind::Temperature);
-	let kelvin = Unit::new(|t| t + 273.15, |t| t + 273.15, Kind::Temperature);
-	let deg_f = 70.;
-	let deg_c = fahrenheit.convert_from(deg_f);
-	let deg_k = kelvin.convert_to(deg_c);
-	println!("{}f = {}c = {}k", deg_f, deg_c, deg_k);
+impl fmt::Display for Unit {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				Self::Meter => "meter",
+				Self::Centimeter => "centimeter",
+				Self::Kilometer => "kilometer",
+				Self::Yard => "yard",
+				Self::Foot => "foot",
+				Self::Mile => "mile",
+			}
+		)
+	}
+}
+
+type ConversionFunc = fn(f64) -> f64;
+
+macro_rules! make_table {
+	( $( $input_unit: path: { $( $output_unit: path: $func: expr ),* } ),* ) => {
+		HashMap::from([
+			$((
+				$input_unit,
+				HashMap::from([
+					$((
+						$output_unit,
+						$func as ConversionFunc
+					)),*
+				])
+			)),*
+		])
+	}
+}
+
+
+static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = LazyLock::new(|| {
+	make_table! {
+		Unit::Meter: {
+			Unit::Yard: |m| m/0.9144,
+			Unit::Centimeter: |m| m*100.,
+			Unit::Kilometer: |m| m/1000.
+		},
+		Unit::Yard: {
+			Unit::Meter: |yd| 0.9144*yd,
+			Unit::Foot: |yd| yd/3.,
+			Unit::Mile: |yd| yd/1760.
+		},
+		Unit::Foot: {Unit::Yard: |ft| 3.*ft},
+		Unit::Mile: {Unit::Yard: |mi| 1760.*mi},
+		Unit::Centimeter: {Unit::Meter: |cm| cm/100.},
+		Unit::Kilometer: {Unit::Meter: |km| km*1000.}
+	}
+});
+
+fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, &'static str> {
+	if input_unit == output_unit {
+		return Ok(amount);
+	}
+	let Some(conversion_path) = find_conversion_path(&input_unit, &output_unit) else {
+		return Err("Cannot convert those units.");
+	};
+	Ok(apply_conversion(amount, conversion_path))
+}
+
+fn apply_conversion(amount: f64, conversion_path: Vec<Unit>) -> f64 {
+	let mut amount = amount;
+	for i in 0..conversion_path.len() - 1 {
+		let input_unit = conversion_path[i];
+		let output_unit = conversion_path[i + 1];
+		print!("{amount} {input_unit} = ");
+		amount = CONVERSIONS[&input_unit][&output_unit](amount);
+		println!("{amount} {output_unit}");
+	}
+	amount
+}
+
+fn find_conversion_path(input_unit: &Unit, output_unit: &Unit) -> Option<Vec<Unit>> {
+	let mut queue: VecDeque<(&Unit, Vec<&Unit>)> = VecDeque::new();
+	let mut seen: HashSet<&Unit> = HashSet::new();
+	queue.push_back((input_unit, vec![]));
+	seen.insert(input_unit);
+	while !queue.is_empty() {
+		let (unit, mut parents) = queue.pop_front().unwrap();
+		if unit == output_unit {
+			parents.push(unit);
+			return Some(parents.into_iter().cloned().collect());
+		}
+		let Some(children) = CONVERSIONS.get(unit) else {
+			continue;
+		};
+		for child in children.keys() {
+			if !seen.contains(child) {
+				seen.insert(child);
+				let mut parents = parents.clone();
+				parents.push(unit);
+				queue.push_back((child, parents));
+			}
+		}
+	}
+	None
+}
+
+fn main() -> Result<(), &'static str> {
+	let mut args = env::args().skip(1);
+	let amount = args.next().ok_or("Need amount")?.parse::<f64>().or(Err("Invalid amount"))?;
+	let from_unit = args.next().ok_or("Need origin unit")?.parse::<Unit>().or(Err("Invalid from unit"))?;
+	let to_unit = args.next().ok_or("Need destination unit")?.parse::<Unit>().or(Err("Invalid to unit"))?;
+
+	println!("Converting {amount}{from_unit} to {to_unit}");
+	let result = do_conversion(amount, from_unit, to_unit)?;
+	println!("{result}");
+	Ok(())
 }
