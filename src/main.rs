@@ -1,4 +1,3 @@
-#![feature(iter_map_windows)]
 use std::{
 	collections::{HashMap, HashSet, VecDeque},
 	env, fmt,
@@ -52,17 +51,17 @@ impl fmt::Display for Unit {
 type ConversionFunc = fn(f64) -> f64;
 
 macro_rules! make_table {
-	( $( $input_unit: path: { $( $output_unit: path: $func: expr ),* } ),* ) => {
+	( $( $( $input_unit:path: { $( $( $output_unit:path: $func:expr ),+ $(,)? )? } ),+ $(,)? )? ) => {
 		HashMap::from([
-			$((
+			$($((
 				$input_unit,
 				HashMap::from([
-					$((
+					$($((
 						$output_unit,
 						$func as ConversionFunc
-					)),*
+					)),*)?
 				])
-			)),*
+			)),*)?
 		])
 	}
 }
@@ -73,17 +72,17 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 		Unit::Meter: {
 			Unit::Yard: |m| m/0.9144,
 			Unit::Centimeter: |m| m*100.,
-			Unit::Kilometer: |m| m/1000.
+			Unit::Kilometer: |m| m/1000.,
 		},
 		Unit::Yard: {
 			Unit::Meter: |yd| 0.9144*yd,
 			Unit::Foot: |yd| yd/3.,
-			Unit::Mile: |yd| yd/1760.
+			Unit::Mile: |yd| yd/1760.,
 		},
 		Unit::Foot: {Unit::Yard: |ft| 3.*ft},
 		Unit::Mile: {Unit::Yard: |mi| 1760.*mi},
 		Unit::Centimeter: {Unit::Meter: |cm| cm/100.},
-		Unit::Kilometer: {Unit::Meter: |km| km*1000.}
+		Unit::Kilometer: {Unit::Meter: |km| km*1000.},
 	}
 });
 
