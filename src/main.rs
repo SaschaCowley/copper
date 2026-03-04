@@ -1,51 +1,57 @@
 use std::{
 	collections::{HashMap, HashSet, VecDeque},
-	env, fmt,
-	str::FromStr,
+	env,
 	sync::LazyLock,
 };
+use strum_macros::EnumString;
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy)]
+const QUETTA: f64 = 10e30; // Q
+const RONNA: f64 = 10e27; // R
+const YOTTA: f64 = 10e24; // Y
+const ZETTA: f64 = 10e21; // A
+const EXA: f64 = 10e18; // E
+const PETA: f64 = 10e15; // P
+const TERA: f64 = 10e12; // T
+const GIGA: f64 = 10e9 ; // G
+const MEGA: f64 = 10e6 ; // M
+const KELO: f64 = 10e3 ; // k
+const HECTO: f64 = 10e2; // h
+const DECA: f64 = 10e1 ; // da
+const DECI: f64 = 10e-1 ; // d
+const CENTI: f64 = 10e-2 ; // c
+const MILLI: f64 = 10e-3 ; // m
+const MICRO: f64 = 10e-6 ; // μ/u
+const NANO: f64 = 10e-9 ; // n
+const PICO: f64 = 10e-12; // p
+const FEMTO: f64 = 10e-15; // f
+const ATTO: f64 = 10e-18; // a
+const ZEPTO: f64 = 10e-21; // z
+const YOCTO: f64 = 10e-24; // y
+const RONTO: f64 = 10e-27; // r
+const QUECTO: f64 = 10e-30; // q
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, strum_macros::Display)]
 enum Unit {
-	Centimeter,
-	Meter,
-	Kilometer,
+	// Length
+	#[strum(serialize="cm", to_string="centimetres")]
+	Centimetre,
+	#[strum(serialize="m", to_string="metres")]
+	Metre,
+	#[strum(serialize="km", to_string="kilometres")]
+	Kilometre,
+	#[strum(serialize="ft", to_string="feet")]
 	Foot,
+	#[strum(serialize="yd", to_string="yards")]
 	Yard,
+	#[strum(serialize="mi", to_string="miles")]
 	Mile,
-}
-
-struct ParseUnitError;
-impl FromStr for Unit {
-	type Err = ParseUnitError;
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match s {
-			"m" => Ok(Unit::Meter),
-			"cm" => Ok(Unit::Centimeter),
-			"km" => Ok(Unit::Kilometer),
-			"yd" => Ok(Unit::Yard),
-			"ft" => Ok(Unit::Foot),
-			"mi" => Ok(Unit::Mile),
-			_ => Err(ParseUnitError),
-		}
-	}
-}
-
-impl fmt::Display for Unit {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(
-			f,
-			"{}",
-			match self {
-				Self::Meter => "meter",
-				Self::Centimeter => "centimeter",
-				Self::Kilometer => "kilometer",
-				Self::Yard => "yard",
-				Self::Foot => "foot",
-				Self::Mile => "mile",
-			}
-		)
-	}
+	
+	// Temperature
+	
+	#[strum(serialize="f", to_string="degrees fahrenheit")]
+	Fahrenheit,
+	#[strum(serialize="c", to_string="degrees celsius")]
+	Celsius,
 }
 
 type ConversionFunc = fn(f64) -> f64;
@@ -69,30 +75,30 @@ macro_rules! make_table {
 
 static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = LazyLock::new(|| {
 	make_table! {
-		Unit::Meter: {
+		Unit::Metre: {
 			Unit::Yard: |m| m/0.9144,
-			Unit::Centimeter: |m| m*100.,
-			Unit::Kilometer: |m| m/1000.,
+			Unit::Centimetre: |m| m*100.0,
+			Unit::Kilometre: |m| m/1000.0,
 		},
 		Unit::Yard: {
-			Unit::Meter: |yd| 0.9144*yd,
-			Unit::Foot: |yd| yd/3.,
-			Unit::Mile: |yd| yd/1760.,
+			Unit::Metre: |yd| 0.9144*yd,
+			Unit::Foot: |yd| yd/3.0,
+			Unit::Mile: |yd| yd/1760.0,
 		},
-		Unit::Foot: {Unit::Yard: |ft| 3.*ft},
-		Unit::Mile: {Unit::Yard: |mi| 1760.*mi},
-		Unit::Centimeter: {Unit::Meter: |cm| cm/100.},
-		Unit::Kilometer: {Unit::Meter: |km| km*1000.},
+		Unit::Foot: {Unit::Yard: |ft| 3.0*ft},
+		Unit::Mile: {Unit::Yard: |mi| 1760.0*mi},
+		Unit::Centimetre: {Unit::Metre: |cm| cm/100.0},
+		Unit::Kilometre: {Unit::Metre: |km| km*1000.0},
+		Unit::Celsius: { Unit::Fahrenheit: |c| 9.0*c/5.0 + 32.0, },
+		Unit::Fahrenheit: { Unit::Celsius: |f| (f-32.0)*5.0/9.0, },
 	}
 });
 
 fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, &'static str> {
-	if input_unit == output_unit {
-		return Ok(amount);
-	}
 	let Some(conversion_path) = find_conversion_path(&input_unit, &output_unit) else {
 		return Err("Cannot convert those units.");
 	};
+	println!("{conversion_path:?}");
 	Ok(apply_conversion(amount, conversion_path))
 }
 
@@ -140,7 +146,7 @@ fn main() -> Result<(), &'static str> {
 	let from_unit = args.next().ok_or("Need origin unit")?.parse::<Unit>().or(Err("Invalid from unit"))?;
 	let to_unit = args.next().ok_or("Need destination unit")?.parse::<Unit>().or(Err("Invalid to unit"))?;
 
-	println!("Converting {amount}{from_unit} to {to_unit}");
+	println!("Converting {amount} {from_unit} to {to_unit}");
 	let result = do_conversion(amount, from_unit, to_unit)?;
 	println!("{result}");
 	Ok(())
