@@ -5,40 +5,46 @@ use std::{
 };
 use strum_macros::EnumString;
 
-const QUETTA: f64 = 10e30; // Q
-const RONNA: f64 = 10e27; // R
-const YOTTA: f64 = 10e24; // Y
-const ZETTA: f64 = 10e21; // A
-const EXA: f64 = 10e18; // E
-const PETA: f64 = 10e15; // P
-const TERA: f64 = 10e12; // T
-const GIGA: f64 = 10e9 ; // G
-const MEGA: f64 = 10e6 ; // M
-const KELO: f64 = 10e3 ; // k
-const HECTO: f64 = 10e2; // h
-const DECA: f64 = 10e1 ; // da
-const DECI: f64 = 10e-1 ; // d
-const CENTI: f64 = 10e-2 ; // c
-const MILLI: f64 = 10e-3 ; // m
-const MICRO: f64 = 10e-6 ; // μ/u
-const NANO: f64 = 10e-9 ; // n
-const PICO: f64 = 10e-12; // p
-const FEMTO: f64 = 10e-15; // f
-const ATTO: f64 = 10e-18; // a
-const ZEPTO: f64 = 10e-21; // z
-const YOCTO: f64 = 10e-24; // y
-const RONTO: f64 = 10e-27; // r
-const QUECTO: f64 = 10e-30; // q
+// const QUETTA: f64 = 1e30; // Q
+// const RONNA: f64 = 1e27; // R
+// const YOTTA: f64 = 1e24; // Y
+// const ZETTA: f64 = 1e21; // A
+// const EXA: f64 = 1e18; // E
+// const PETA: f64 = 1e15; // P
+// const TERA: f64 = 1e12; // T
+// const GIGA: f64 = 1e9 ; // G
+// const MEGA: f64 = 1e6 ; // M
+const KILO: f64 = 1e3 ; // k
+// const HECTO: f64 = 1e2; // h
+// const DECA: f64 = 1e1 ; // da
+// const DECI: f64 = 1e-1 ; // d
+const CENTI: f64 = 1e-2 ; // c
+const MILLI: f64 = 1e-3 ; // m
+// const MICRO: f64 = 1e-6 ; // μ/u
+// const NANO: f64 = 1e-9 ; // n
+// const PICO: f64 = 1e-12; // p
+// const FEMTO: f64 = 1e-15; // f
+// const ATTO: f64 = 1e-18; // a
+// const ZEPTO: f64 = 1e-21; // z
+// const YOCTO: f64 = 1e-24; // y
+// const RONTO: f64 = 1e-27; // r
+// const QUECTO: f64 = 1e-30; // q
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, strum_macros::Display)]
 enum Unit {
 	// Length
+	// Metric
+	#[strum(serialize="mm", to_string="millimetres")]
+	Millimetre,
 	#[strum(serialize="cm", to_string="centimetres")]
 	Centimetre,
 	#[strum(serialize="m", to_string="metres")]
 	Metre,
 	#[strum(serialize="km", to_string="kilometres")]
 	Kilometre,
+	// Imperial
+	#[strum(serialize="in", to_string="inches")]
+	Inch,
 	#[strum(serialize="ft", to_string="feet")]
 	Foot,
 	#[strum(serialize="yd", to_string="yards")]
@@ -47,7 +53,6 @@ enum Unit {
 	Mile,
 	
 	// Temperature
-	
 	#[strum(serialize="f", to_string="degrees fahrenheit")]
 	Fahrenheit,
 	#[strum(serialize="c", to_string="degrees celsius")]
@@ -77,15 +82,18 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 	make_table! {
 		Unit::Metre: {
 			Unit::Yard: |m| m/0.9144,
-			Unit::Centimetre: |m| m*100.0,
-			Unit::Kilometre: |m| m/1000.0,
+			Unit::Centimetre: |m| m/CENTI,
+			Unit::Kilometre: |m| m*KILO,
+			Unit::Millimetre: |m| m/MILLI,
 		},
 		Unit::Yard: {
 			Unit::Metre: |yd| 0.9144*yd,
-			Unit::Foot: |yd| yd/3.0,
+			Unit::Inch: |yd| yd*36.0,
+			Unit::Foot: |yd| yd*3.0,
 			Unit::Mile: |yd| yd/1760.0,
 		},
-		Unit::Foot: {Unit::Yard: |ft| 3.0*ft},
+		Unit::Inch: {Unit::Yard: |yd| yd/36.0},
+		Unit::Foot: {Unit::Yard: |ft| ft/3.0},
 		Unit::Mile: {Unit::Yard: |mi| 1760.0*mi},
 		Unit::Centimetre: {Unit::Metre: |cm| cm/100.0},
 		Unit::Kilometre: {Unit::Metre: |km| km*1000.0},
