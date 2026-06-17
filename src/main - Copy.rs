@@ -1,115 +1,179 @@
-use std::str::FromStr;
-/*
-expression = operand [operator expression]
-operand = integer
-integer = digit-excluding-zero {digit}
-digit-excluding-zero = "1"-"9"
-digit = "0" | digit-excluding-zero
-operator = "+" | "-" | "*" | "/"
-*/
+use std::{
+	collections::{HashMap, HashSet, VecDeque},
+	env,
+	sync::LazyLock,
+};
+use strum_macros::EnumString;
 
-// enum Kind {
-	// _Length,
-	// Temperature,
-// }
+// const QUETTA: f64 = 1e30; // Q
+// const RONNA: f64 = 1e27; // R
+// const YOTTA: f64 = 1e24; // Y
+// const ZETTA: f64 = 1e21; // A
+// const EXA: f64 = 1e18; // E
+// const PETA: f64 = 1e15; // P
+// const TERA: f64 = 1e12; // T
+// const GIGA: f64 = 1e9 ; // G
+// const MEGA: f64 = 1e6 ; // M
+const KILO: f64 = 1e3 ; // k
+// const HECTO: f64 = 1e2; // h
+// const DECA: f64 = 1e1 ; // da
+// const DECI: f64 = 1e-1 ; // d
+const CENTI: f64 = 1e2 ; // c
+const MILLI: f64 = 1e-3 ; // m
+// const MICRO: f64 = 1e-6 ; // μ/u
+// const NANO: f64 = 1e-9 ; // n
+// const PICO: f64 = 1e-12; // p
+// const FEMTO: f64 = 1e-15; // f
+// const ATTO: f64 = 1e-18; // a
+// const ZEPTO: f64 = 1e-21; // z
+// const YOCTO: f64 = 1e-24; // y
+// const RONTO: f64 = 1e-27; // r
+// const QUECTO: f64 = 1e-30; // q
 
-// type ConversionFunction = fn(f64) -> f64;
-// struct Unit {
-	// from_base: ConversionFunction,
-	// to_base: ConversionFunction,
-	// _kind: Kind,
-// }
+#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, strum_macros::Display)]
+enum Unit {
+	// Length
+	// Metric
+	#[strum(serialize="mm", to_string="millimetres")]
+	Millimetre,
+	#[strum(serialize="cm", to_string="centimetres")]
+	Centimetre,
+	#[strum(serialize="m", to_string="metres")]
+	Metre,
+	#[strum(serialize="km", to_string="kilometres")]
+	Kilometre,
+	// Imperial
+	#[strum(serialize="in", to_string="inches")]
+	Inch,
+	#[strum(serialize="ft", to_string="feet")]
+	Foot,
+	#[strum(serialize="yd", to_string="yards")]
+	Yard,
+	#[strum(serialize="mi", to_string="miles")]
+	Mile,
+	
+	// Temperature
+	#[strum(serialize="f", to_string="degrees fahrenheit")]
+	Fahrenheit,
+	#[strum(serialize="c", to_string="degrees celsius")]
+	Celsius,
+}
 
-// impl Unit {
-	// fn new(from_base: ConversionFunction, to_base: ConversionFunction, _kind: Kind) -> Self {
-		// Self { from_base, to_base, _kind }
+type ConversionFunc = fn(f64) -> f64;
+
+macro_rules! make_table {
+	( $( $( $input_unit:path: { $( $( $output_unit:path: $func:expr ),+ $(,)? )? } ),+ $(,)? )? ) => {
+		HashMap::from([
+			$($((
+				$input_unit,
+				HashMap::from([
+					$($((
+						$output_unit,
+						$func as ConversionFunc
+					)),*)?
+				])
+			)),*)?
+		])
+	}
+}
+
+macro_rules! scalar {
+	( $scale:expr ) => { |x| $scale * x }
+	// ( $( $( $input_unit:path: { $( $( $output_unit:path: $func:expr ),+ $(,)? )? } ),+ $(,)? )? ) => {
+		// HashMap::from([
+			// $($((
+				// $input_unit,
+				// HashMap::from([
+					// $($((
+						// $output_unit,
+						// $func as ConversionFunc
+					// )),*)?
+				// ])
+			// )),*)?
+		// ])
 	// }
-	
-	// pub fn convert_from(&self, value: f64) -> f64 {
-		// (self.to_base)(value)
-	// }
-	
-	// pub fn convert_to(&self, value: f64) -> f64 {
-		// (self.from_base)(value)
-	// }
-// }
-
-// struct 
-fn main() {
-	// let a = Operation::Add(Value::Num(1), Value::Num(2));
-	// let b = Operation::Mul(Value::Num(3), Value::Num(4));
-	// println!("{:?}, {:?}", a, b);
-	// let _celcius = Unit::new(|t| t, |t| t, Kind::Temperature);
-	// let fahrenheit = Unit::new(|t| (9. * t / 5.) + 32., |t| 5. * (t - 32.) / 9., Kind::Temperature);
-	// let kelvin = Unit::new(|t| t + 273.15, |t| t + 273.15, Kind::Temperature);
-	// let deg_f = 70.;
-	// let deg_c = fahrenheit.convert_from(deg_f);
-	// let deg_k = kelvin.convert_to(deg_c);
-	// println!("{}f = {}c = {}k", deg_f, deg_c, deg_k);
-	let program = "101234";
-	let parsed = parse(program);
-	println!("From: {:?}; to: {:?}", program, parsed);
 }
 
-struct CodeScanner {
-	cursor: usize,
-	code: Vec<char>,
+
+static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = LazyLock::new(|| {
+	make_table! {
+		Unit::Metre: {
+			Unit::Yard: |m| m/0.9144,
+			// Unit::Centimetre: |m| m/CENTI,
+			Unit::Centimetre: scalar!(CENTI),
+			Unit::Kilometre: |m| m*KILO,
+			Unit::Millimetre: |m| m/MILLI,
+		},
+		Unit::Yard: {
+			Unit::Metre: |yd| 0.9144*yd,
+			Unit::Inch: |yd| yd*36.0,
+			Unit::Foot: |yd| yd*3.0,
+			Unit::Mile: |yd| yd/1760.0,
+		},
+		Unit::Inch: {Unit::Yard: |yd| yd/36.0},
+		Unit::Foot: {Unit::Yard: |ft| ft/3.0},
+		Unit::Mile: {Unit::Yard: |mi| 1760.0*mi},
+		Unit::Centimetre: {Unit::Metre: |cm| cm/100.0},
+		Unit::Kilometre: {Unit::Metre: |km| km*1000.0},
+		Unit::Celsius: { Unit::Fahrenheit: |c| 9.0*c/5.0 + 32.0, },
+		Unit::Fahrenheit: { Unit::Celsius: |f| (f-32.0)*5.0/9.0, },
+	}
+});
+
+fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, &'static str> {
+	let Some(conversion_path) = find_conversion_path(&input_unit, &output_unit) else {
+		return Err("Cannot convert those units.");
+	};
+	println!("{conversion_path:?}");
+	Ok(apply_conversion(amount, conversion_path))
 }
 
-impl CodeScanner {
-	fn new(code: &str) -> Self {
-		Self {cursor: 0, code: code.chars().collect() }
+fn apply_conversion(amount: f64, conversion_path: Vec<Unit>) -> f64 {
+	let mut amount = amount;
+	for i in 0..conversion_path.len() - 1 {
+		let input_unit = conversion_path[i];
+		let output_unit = conversion_path[i + 1];
+		print!("{amount} {input_unit} = ");
+		amount = CONVERSIONS[&input_unit][&output_unit](amount);
+		println!("{amount} {output_unit}");
 	}
-	
-	fn peak(&self) -> Option<&char> {
-		self.code.get(self.cursor)
-	}
-	
-	fn pop(&mut self) -> Option<&char> {
-		if let Some(character) = self.code.get(self.cursor) {
-			self.cursor += 1;
-			Some(character)
-		} else {
-			None
-		}
-	}
-	
-	fn accept(&mut self, predicate: impl FnOnce(&char) -> bool) -> Option<&char> {
-		if let Some(character) = self.peak() {
-			if predicate(character) { self.pop()} else { None }
-		} else {
-			None
-		}
-	}
-	
-	fn expect(&mut self, predicate: impl FnOnce(&char) -> bool) -> Result<&char, &'static str> {
-		if let Some(character) = self.accept(predicate) {
-			Ok(character)
-		} else {
-			Err("Unexpected character")
-		}
-	}
-	
-	fn is_exhausted(&self) -> bool { self.cursor == self.code.len() }
+	amount
 }
 
-#[derive(Debug)]
-struct Integer(i128);
-
-fn parse(string: &str) -> Result<Integer, &'static str> {
-	let mut scanner = CodeScanner::new(string);
-	let number = integer(&mut scanner)?;
-	if  scanner.is_exhausted() { Ok(number) } else { Err("Expected the string to be fully consumed") } 
-}
-
-fn integer(scanner: &mut CodeScanner) -> Result<Integer, &'static str> {
-	let mut string = String::new();
-	string.push(*scanner.expect(|character| ('1'..='9').contains(character))?);
-	loop {
-		match scanner.accept(|character| ('0'..='9').contains(character)) {
-			Some(character) => string.push(*character),
-			None => break,
+fn find_conversion_path(input_unit: &Unit, output_unit: &Unit) -> Option<Vec<Unit>> {
+	let mut queue: VecDeque<(&Unit, Vec<&Unit>)> = VecDeque::new();
+	let mut seen: HashSet<&Unit> = HashSet::new();
+	queue.push_back((input_unit, vec![]));
+	seen.insert(input_unit);
+	while !queue.is_empty() {
+		let (unit, mut parents) = queue.pop_front().unwrap();
+		if unit == output_unit {
+			parents.push(unit);
+			return Some(parents.into_iter().cloned().collect());
+		}
+		let Some(children) = CONVERSIONS.get(unit) else {
+			continue;
+		};
+		for child in children.keys() {
+			if !seen.contains(child) {
+				seen.insert(child);
+				let mut parents = parents.clone();
+				parents.push(unit);
+				queue.push_back((child, parents));
+			}
 		}
 	}
-	Ok(Integer(i128::from_str(&string).expect("Should be a valid integer")))
+	None
+}
+
+fn main() -> Result<(), &'static str> {
+	let mut args = env::args().skip(1);
+	let amount = args.next().ok_or("Need amount")?.parse::<f64>().or(Err("Invalid amount"))?;
+	let from_unit = args.next().ok_or("Need origin unit")?.parse::<Unit>().or(Err("Invalid from unit"))?;
+	let to_unit = args.next().ok_or("Need destination unit")?.parse::<Unit>().or(Err("Invalid to unit"))?;
+
+	println!("Converting {amount} {from_unit} to {to_unit}");
+	let result = do_conversion(amount, from_unit, to_unit)?;
+	println!("{result}");
+	Ok(())
 }
