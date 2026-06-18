@@ -12,10 +12,14 @@ use libcopper::make_table;
 // const ZETTA: f64 = 1e21; // A
 // const EXA: f64 = 1e18; // E
 // const PETA: f64 = 1e15; // P
-// const TERA: f64 = 1e12; // T
-// const GIGA: f64 = 1e9 ; // G
-// const MEGA: f64 = 1e6 ; // M
+const TERA: f64 = 1e12; // T
+const TEBI: f64 = (1i64 <<40) as f64; // T
+const GIGA: f64 = 1e9 ; // G
+const GIBI: f64 = (1<<30) as f64; // G
+const MEGA: f64 = 1e6 ; // M
+const MEBI: f64 = (1<<20) as f64; // M
 const KILO: f64 = 1e3 ; // k
+const KIBI: f64 = (1<<10) as f64;
 // const HECTO: f64 = 1e2; // h
 // const DECA: f64 = 1e1 ; // da
 // const DECI: f64 = 1e-1 ; // d
@@ -54,14 +58,56 @@ enum Unit {
 	Mile,
 	
 	// Temperature
-	#[strum(serialize="c", to_string="degrees celsius")]
+	// Metric
+	#[strum(serialize="C", to_string="degrees celsius")]
 	Celsius,
 	#[strum(serialize="K", to_string="kelvin")]
 	Kelvin,
-	#[strum(serialize="f", to_string="degrees fahrenheit")]
+	// Imperial
+	#[strum(serialize="F", to_string="degrees fahrenheit")]
 	Fahrenheit,
 	#[strum(serialize="R", to_string="degrees Rankine")]
 	Rankine,
+	
+	// Data
+	#[strum(serialize="b", to_string="bits")]
+	Bit,
+	#[strum(serialize="B", to_string="bytes")]
+	Byte,
+	// Metric
+	#[strum(serialize="kb", to_string="kilobits")]
+	Kilobit,
+	#[strum(serialize="kB", to_string="kilobytes")]
+	Kilobyte,
+	#[strum(serialize="Mb", to_string="megabits")]
+	Megabit,
+	#[strum(serialize="MB", to_string="megabytes")]
+	Megabyte,
+	#[strum(serialize="Gb", to_string="gigabits")]
+	Gigabit,
+	#[strum(serialize="GB", to_string="gigabytes")]
+	Gigabyte,
+	#[strum(serialize="Tb", to_string="terabits")]
+	Terabit,
+	#[strum(serialize="TB", to_string="terabytes")]
+	Terabyte,
+	// IEC
+	#[strum(serialize="Kib", to_string="kibibits")]
+	Kibibit,
+	#[strum(serialize="KiB", to_string="kibibytes")]
+	Kibibyte,
+	#[strum(serialize="Mib", to_string="mebibits")]
+	Mebibit,
+	#[strum(serialize="MiB", to_string="mebibytes")]
+	Mebibyte,
+	#[strum(serialize="Gib", to_string="gibibits")]
+	Gibibit,
+	#[strum(serialize="GiB", to_string="gibibytes")]
+	Gibibyte,
+	#[strum(serialize="Tib", to_string="tebibits")]
+	Tebibit,
+	#[strum(serialize="TiB", to_string="tebibytes")]
+	Tebibyte,
 }
 
 type ConversionFunc = fn(f64) -> f64;
@@ -79,6 +125,7 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 			Unit::Foot =>  mul 3.0,
 			Unit::Mile =>  div 1760.0,
 		}, 
+		
 		Unit::Celsius -> {
 			Unit::Kelvin => add 273.15,
 			Unit::Fahrenheit => fun(|c| 9.0*c/5.0 + 32.0),
@@ -86,6 +133,28 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 		Unit::Fahrenheit -> {
 			Unit::Rankine => add 459.67,
 			Unit::Celsius => fun(|f| (f-32.0)*5.0/9.0),
+		},
+		
+		Unit::Bit -> {
+			Unit::Kilobit => div KILO,
+			Unit::Kibibit => div KIBI,
+			Unit::Megabit => div MEGA,
+			Unit::Mebibit => div MEBI,
+			Unit::Gigabit => div GIGA,
+			Unit::Gibibit => div GIBI,
+			Unit::Terabit => div TERA,
+			Unit::Tebibit => div TEBI,
+		},
+		Unit::Byte -> {
+			Unit::Bit => mul 8.0,
+			Unit::Kilobyte => div KILO,
+			Unit::Kibibyte => div KIBI,
+			Unit::Megabyte => div MEGA,
+			Unit::Mebibyte => div MEBI,
+			Unit::Gigabyte => div GIGA,
+			Unit::Gibibyte => div GIBI,
+			Unit::Terabyte => div TERA,
+			Unit::Tebibyte => div TEBI,
 		},
 	}
 });
