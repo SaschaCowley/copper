@@ -2,9 +2,10 @@ use std::{
 	collections::{HashMap, HashSet, VecDeque},
 	sync::LazyLock,
 };
-use strum_macros::{EnumString, EnumMessage};
+
+use clap::Parser;
 use libcopper::make_table;
-use clap::{Parser};
+use strum_macros::{EnumMessage, EnumString};
 
 // const QUETTA: f64 = 1e30; // Q
 // const RONNA: f64 = 1e27; // R
@@ -13,18 +14,18 @@ use clap::{Parser};
 // const EXA: f64 = 1e18; // E
 // const PETA: f64 = 1e15; // P
 const TERA: f64 = 1e12; // T
-const TEBI: f64 = (1i64 <<40) as f64; // T
-const GIGA: f64 = 1e9 ; // G
-const GIBI: f64 = (1<<30) as f64; // G
-const MEGA: f64 = 1e6 ; // M
-const MEBI: f64 = (1<<20) as f64; // M
-const KILO: f64 = 1e3 ; // k
-const KIBI: f64 = (1<<10) as f64;
+const TEBI: f64 = (1i64 << 40) as f64; // T
+const GIGA: f64 = 1e9; // G
+const GIBI: f64 = (1 << 30) as f64; // G
+const MEGA: f64 = 1e6; // M
+const MEBI: f64 = (1 << 20) as f64; // M
+const KILO: f64 = 1e3; // k
+const KIBI: f64 = (1 << 10) as f64;
 // const HECTO: f64 = 1e2; // h
 // const DECA: f64 = 1e1 ; // da
 // const DECI: f64 = 1e-1 ; // d
-const CENTI: f64 = 1e-2 ; // c
-const MILLI: f64 = 1e-3 ; // m
+const CENTI: f64 = 1e-2; // c
+const MILLI: f64 = 1e-3; // m
 // const MICRO: f64 = 1e-6 ; // μ/u
 // const NANO: f64 = 1e-9 ; // n
 // const PICO: f64 = 1e-12; // p
@@ -39,74 +40,74 @@ const MILLI: f64 = 1e-3 ; // m
 enum Unit {
 	// Length
 	// Metric
-	#[strum(serialize="mm", to_string="mm", message="millimetres")]
+	#[strum(serialize = "mm", to_string = "mm", message = "millimetres")]
 	Millimetre,
-	#[strum(serialize="cm", to_string="cm", message="centimetres")]
+	#[strum(serialize = "cm", to_string = "cm", message = "centimetres")]
 	Centimetre,
-	#[strum(serialize="m", to_string="m", message="metres")]
+	#[strum(serialize = "m", to_string = "m", message = "metres")]
 	Metre,
-	#[strum(serialize="km", to_string="km", message="kilometres")]
+	#[strum(serialize = "km", to_string = "km", message = "kilometres")]
 	Kilometre,
 	// Imperial
-	#[strum(serialize="in", to_string="″", message="inches")]
+	#[strum(serialize = "in", to_string = "″", message = "inches")]
 	Inch,
-	#[strum(serialize="ft", to_string="′", message="feet")]
+	#[strum(serialize = "ft", to_string = "′", message = "feet")]
 	Foot,
-	#[strum(serialize="yd", to_string="yd", message="yards")]
+	#[strum(serialize = "yd", to_string = "yd", message = "yards")]
 	Yard,
-	#[strum(serialize="mi", to_string="miles")]
+	#[strum(serialize = "mi", to_string = "miles")]
 	Mile,
-	
+
 	// Temperature
 	// Metric
-	#[strum(serialize="C", to_string="°C", message="degrees celsius")]
+	#[strum(serialize = "C", to_string = "°C", message = "degrees celsius")]
 	Celsius,
-	#[strum(serialize="K", to_string="K", message="kelvin")]
+	#[strum(serialize = "K", to_string = "K", message = "kelvin")]
 	Kelvin,
 	// Imperial
-	#[strum(serialize="F", to_string="°F", message="degrees fahrenheit")]
+	#[strum(serialize = "F", to_string = "°F", message = "degrees fahrenheit")]
 	Fahrenheit,
-	#[strum(serialize="R", to_string="°R", message="degrees Rankine")]
+	#[strum(serialize = "R", to_string = "°R", message = "degrees Rankine")]
 	Rankine,
-	
+
 	// Data
-	#[strum(serialize="b", to_string="bits")]
+	#[strum(serialize = "b", to_string = "bits")]
 	Bit,
-	#[strum(serialize="B", to_string="bytes")]
+	#[strum(serialize = "B", to_string = "bytes")]
 	Byte,
 	// Metric
-	#[strum(serialize="kb", to_string="kilobits")]
+	#[strum(serialize = "kb", to_string = "kilobits")]
 	Kilobit,
-	#[strum(serialize="kB", to_string="kilobytes")]
+	#[strum(serialize = "kB", to_string = "kilobytes")]
 	Kilobyte,
-	#[strum(serialize="Mb", to_string="megabits")]
+	#[strum(serialize = "Mb", to_string = "megabits")]
 	Megabit,
-	#[strum(serialize="MB", to_string="megabytes")]
+	#[strum(serialize = "MB", to_string = "megabytes")]
 	Megabyte,
-	#[strum(serialize="Gb", to_string="gigabits")]
+	#[strum(serialize = "Gb", to_string = "gigabits")]
 	Gigabit,
-	#[strum(serialize="GB", to_string="gigabytes")]
+	#[strum(serialize = "GB", to_string = "gigabytes")]
 	Gigabyte,
-	#[strum(serialize="Tb", to_string="terabits")]
+	#[strum(serialize = "Tb", to_string = "terabits")]
 	Terabit,
-	#[strum(serialize="TB", to_string="terabytes")]
+	#[strum(serialize = "TB", to_string = "terabytes")]
 	Terabyte,
 	// IEC
-	#[strum(serialize="Kib", to_string="kibibits")]
+	#[strum(serialize = "Kib", to_string = "kibibits")]
 	Kibibit,
-	#[strum(serialize="KiB", to_string="kibibytes")]
+	#[strum(serialize = "KiB", to_string = "kibibytes")]
 	Kibibyte,
-	#[strum(serialize="Mib", to_string="mebibits")]
+	#[strum(serialize = "Mib", to_string = "mebibits")]
 	Mebibit,
-	#[strum(serialize="MiB", to_string="mebibytes")]
+	#[strum(serialize = "MiB", to_string = "mebibytes")]
 	Mebibyte,
-	#[strum(serialize="Gib", to_string="gibibits")]
+	#[strum(serialize = "Gib", to_string = "gibibits")]
 	Gibibit,
-	#[strum(serialize="GiB", to_string="gibibytes")]
+	#[strum(serialize = "GiB", to_string = "gibibytes")]
 	Gibibyte,
-	#[strum(serialize="Tib", to_string="tebibits")]
+	#[strum(serialize = "Tib", to_string = "tebibits")]
 	Tebibit,
-	#[strum(serialize="TiB", to_string="tebibytes")]
+	#[strum(serialize = "TiB", to_string = "tebibytes")]
 	Tebibyte,
 }
 
@@ -124,8 +125,8 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 			Unit::Inch => mul 36.0,
 			Unit::Foot =>  mul 3.0,
 			Unit::Mile =>  div 1760.0,
-		}, 
-		
+		},
+
 		Unit::Celsius -> {
 			Unit::Kelvin => add 273.15,
 			Unit::Fahrenheit => fun(|c| 9.0*c/5.0 + 32.0),
@@ -134,7 +135,7 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 			Unit::Rankine => add 459.67,
 			Unit::Celsius => fun(|f| (f-32.0)*5.0/9.0),
 		},
-		
+
 		Unit::Bit -> {
 			Unit::Kilobit => div KILO,
 			Unit::Kibibit => div KIBI,
@@ -211,10 +212,10 @@ struct Cli {
 	/// Quantity to convert
 	quantity: f64,
 	/// Input unit
-	#[arg(id="FROM")]
+	#[arg(id = "FROM")]
 	input_unit: Unit,
 	/// Output unit
-	#[arg(id="TO")]
+	#[arg(id = "TO")]
 	output_unit: Unit,
 }
 
