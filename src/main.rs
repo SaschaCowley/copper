@@ -23,7 +23,7 @@ const KIBI: f64 = (1<<10) as f64;
 // const HECTO: f64 = 1e2; // h
 // const DECA: f64 = 1e1 ; // da
 // const DECI: f64 = 1e-1 ; // d
-const CENTI: f64 = 1e2 ; // c
+const CENTI: f64 = 1e-2 ; // c
 const MILLI: f64 = 1e-3 ; // m
 // const MICRO: f64 = 1e-6 ; // μ/u
 // const NANO: f64 = 1e-9 ; // n
@@ -116,9 +116,9 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 	make_table! {
 		Unit::Metre -> {
 			Unit::Yard => div 0.9144,
-			Unit::Centimetre => mul CENTI,
-			Unit::Kilometre => mul KILO,
 			Unit::Millimetre => div MILLI,
+			Unit::Centimetre => div CENTI,
+			Unit::Kilometre => div KILO,
 		},
 		Unit::Yard -> {
 			Unit::Inch => mul 36.0,
