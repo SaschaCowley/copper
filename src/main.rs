@@ -1,10 +1,10 @@
 use std::{
 	collections::{HashMap, HashSet, VecDeque},
-	env,
 	sync::LazyLock,
 };
-use strum_macros::EnumString;
+use strum_macros::{EnumString, EnumMessage};
 use libcopper::make_table;
+use clap::{Parser};
 
 // const QUETTA: f64 = 1e30; // Q
 // const RONNA: f64 = 1e27; // R
@@ -35,38 +35,38 @@ const MILLI: f64 = 1e-3 ; // m
 // const RONTO: f64 = 1e-27; // r
 // const QUECTO: f64 = 1e-30; // q
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, strum_macros::Display)]
+#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, EnumMessage, strum_macros::Display)]
 enum Unit {
 	// Length
 	// Metric
-	#[strum(serialize="mm", to_string="millimetres")]
+	#[strum(serialize="mm", to_string="mm", message="millimetres")]
 	Millimetre,
-	#[strum(serialize="cm", to_string="centimetres")]
+	#[strum(serialize="cm", to_string="cm", message="centimetres")]
 	Centimetre,
-	#[strum(serialize="m", to_string="metres")]
+	#[strum(serialize="m", to_string="m", message="metres")]
 	Metre,
-	#[strum(serialize="km", to_string="kilometres")]
+	#[strum(serialize="km", to_string="km", message="kilometres")]
 	Kilometre,
 	// Imperial
-	#[strum(serialize="in", to_string="inches")]
+	#[strum(serialize="in", to_string="″", message="inches")]
 	Inch,
-	#[strum(serialize="ft", to_string="feet")]
+	#[strum(serialize="ft", to_string="′", message="feet")]
 	Foot,
-	#[strum(serialize="yd", to_string="yards")]
+	#[strum(serialize="yd", to_string="yd", message="yards")]
 	Yard,
 	#[strum(serialize="mi", to_string="miles")]
 	Mile,
 	
 	// Temperature
 	// Metric
-	#[strum(serialize="C", to_string="degrees celsius")]
+	#[strum(serialize="C", to_string="°C", message="degrees celsius")]
 	Celsius,
-	#[strum(serialize="K", to_string="kelvin")]
+	#[strum(serialize="K", to_string="K", message="kelvin")]
 	Kelvin,
 	// Imperial
-	#[strum(serialize="F", to_string="degrees fahrenheit")]
+	#[strum(serialize="F", to_string="°F", message="degrees fahrenheit")]
 	Fahrenheit,
-	#[strum(serialize="R", to_string="degrees Rankine")]
+	#[strum(serialize="R", to_string="°R", message="degrees Rankine")]
 	Rankine,
 	
 	// Data
@@ -205,14 +205,23 @@ fn find_conversion_path(input_unit: &Unit, output_unit: &Unit) -> Option<Vec<Uni
 	None
 }
 
-fn main() -> Result<(), &'static str> {
-	let mut args = env::args().skip(1);
-	let amount = args.next().ok_or("Need amount")?.parse::<f64>().or(Err("Invalid amount"))?;
-	let from_unit = args.next().ok_or("Need origin unit")?.parse::<Unit>().or(Err("Invalid from unit"))?;
-	let to_unit = args.next().ok_or("Need destination unit")?.parse::<Unit>().or(Err("Invalid to unit"))?;
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+	/// Quantity to convert
+	quantity: f64,
+	/// Input unit
+	#[arg(id="FROM")]
+	input_unit: Unit,
+	/// Output unit
+	#[arg(id="TO")]
+	output_unit: Unit,
+}
 
-	println!("Converting {amount} {from_unit} to {to_unit}");
-	let result = do_conversion(amount, from_unit, to_unit)?;
+fn main() -> Result<(), &'static str> {
+	let cli = Cli::parse();
+	println!("Converting {}  {} to {}", cli.quantity, cli.input_unit, cli.output_unit);
+	let result = do_conversion(cli.quantity, cli.input_unit, cli.output_unit)?;
 	println!("{result}");
 	Ok(())
 }
