@@ -62,9 +62,6 @@ enum Conversion {
 		div_token: kw::div,
 		by: TokenTree,
 	}
-	// Div(?),
-	// Add(?),
-	// Sub(?),
 	// Fun(?),
 }
 
@@ -134,11 +131,6 @@ impl Parse for ConversionRHS {
 		}
 		let arrow_token = input.parse::<Token!(=>)>()?;
 		let  conversion = input.parse::<Conversion>()?;
-		// let mut conversion = TokenStream::new();
-		// while !input.is_empty() && !input.peek(Token!(,)) {
-			// conversion.extend(input.parse::<TokenTree>());
-		// }
-		println!("Converting to: {:?}\nConversion method: {:?}", output_unit, conversion);
 		Ok(Self {output_unit, arrow_token, conversion })
 	}
 }
@@ -171,7 +163,6 @@ impl Parse for ConversionRow {
 			input_unit.extend(input.parse::<TokenTree>());
 		}
 		let arrow_token = input.parse::<punc::ThinArrow>()?;
-		println!("Converting from: {:?}", input_unit);
 		let outputs = input.parse::<OutputType>()?;
 		Ok(Self {input_unit, arrow_token, outputs})
 	}
@@ -190,7 +181,6 @@ impl ConcreteConversion {
 		match conversion {
 			Conversion::Mul{ mul_token, by } => Some(Self { input_unit: output_unit.clone(), output_unit: input_unit.clone(), conversion: Conversion::Div{div_token: kw::div(mul_token.span), by: by.clone()}  }),
 			Conversion::Div{ div_token, by } => Some(Self { input_unit: output_unit.clone(), output_unit: input_unit.clone(), conversion: Conversion::Mul{mul_token: kw::mul(div_token.span), by: by.clone()}  }),
-			_ => None
 		}
 	}
 }
@@ -221,24 +211,17 @@ impl Parse for ConversionTable {
 pub fn make_table(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let mut table = parse_macro_input!(input as ConversionTable);
 	let mut tree: HashMap<Unit, HashMap<Unit, Conversion>> = HashMap::new();
-	println!("Preparing tree");
-	// for ConcreteConversion { input_unit, output_unit, conversion } in table.explicit_conversions.drain(..) {
 	for ConcreteConversion { input_unit, output_unit, conversion } in table.implicit_conversions.drain(..).chain(table.explicit_conversions.drain(..)) {
 		tree.entry(input_unit).or_default().insert(output_unit, conversion);
 	}
-	println!("Preparing output.");
 	let mut branches = Vec::new();
 	for (input_unit, outputs) in tree.iter() {
-		println!("Input unit: {}", input_unit.key);
 		let mut leaves = Vec::new();
 		for (output_unit, conversion) in outputs.iter() {
 			leaves.push(quote! { (#output_unit, (#conversion) as ConversionFunc) });
-			println!("Output: {}", leaves[leaves.len()-1]);
 		}
 		branches.push(quote!{(#input_unit, HashMap::from([#(#leaves),*]))});
 	}
 	let expanded = quote! {HashMap::from([#(#branches),*])};
-	println!("{}", expanded);
-	
 	proc_macro::TokenStream::from(expanded)
 }

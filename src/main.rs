@@ -62,7 +62,6 @@ enum Unit {
 
 type ConversionFunc = fn(f64) -> f64;
 
-
 static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = LazyLock::new(|| {
 	make_table! {
 		Unit::Metre -> {
