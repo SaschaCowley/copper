@@ -54,10 +54,14 @@ enum Unit {
 	Mile,
 	
 	// Temperature
-	#[strum(serialize="f", to_string="degrees fahrenheit")]
-	Fahrenheit,
 	#[strum(serialize="c", to_string="degrees celsius")]
 	Celsius,
+	#[strum(serialize="K", to_string="kelvin")]
+	Kelvin,
+	#[strum(serialize="f", to_string="degrees fahrenheit")]
+	Fahrenheit,
+	#[strum(serialize="R", to_string="degrees Rankine")]
+	Rankine,
 }
 
 type ConversionFunc = fn(f64) -> f64;
@@ -74,9 +78,15 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 			Unit::Inch => mul 36.0,
 			Unit::Foot =>  mul 3.0,
 			Unit::Mile =>  div 1760.0,
+		}, 
+		Unit::Celsius -> {
+			Unit::Kelvin => add 273.15,
+			Unit::Fahrenheit => fun(|c| 9.0*c/5.0 + 32.0),
 		},
-		// Unit::Celsius: { Unit::Fahrenheit: |c| 9.0*c/5.0 + 32.0, },
-		// Unit::Fahrenheit: { Unit::Celsius: |f| (f-32.0)*5.0/9.0, },
+		Unit::Fahrenheit -> {
+			Unit::Rankine => add 459.67,
+			Unit::Celsius => fun(|f| (f-32.0)*5.0/9.0),
+		},
 	}
 });
 

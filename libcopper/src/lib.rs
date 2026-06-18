@@ -6,6 +6,7 @@ use syn::{
 	token,
 	punctuated::Punctuated,
 	braced,
+	parenthesized,
 };
 use quote::{quote, ToTokens};
 use std::{
@@ -20,6 +21,9 @@ mod punc {
 mod kw {
 	syn::custom_keyword!(mul);
 	syn::custom_keyword!(div);
+	syn::custom_keyword!(add);
+	syn::custom_keyword!(sub);
+	syn::custom_keyword!(fun);
 }
 
 #[derive(Clone, Debug)]
@@ -61,15 +65,30 @@ enum Conversion {
 	Div {
 		div_token: kw::div,
 		by: TokenTree,
-	}
-	// Fun(?),
+	},
+	Add {
+		add_token: kw::add,
+		by: TokenTree,
+	},
+	Sub {
+		sub_token: kw::sub,
+		by: TokenTree,
+	},
+	Fun {
+		fun_token: kw::fun,
+		paren_token: token::Paren,
+		fun: TokenStream,
+	},
 }
 
 impl fmt::Debug for Conversion {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Mul { by, .. } => f.debug_struct("Conversion::Mul").field("by", by).finish(),
-			Self::Div { by, .. } => f.debug_struct("Conversion::Div").field("by", by).finish()
+			Self::Div { by, .. } => f.debug_struct("Conversion::Div").field("by", by).finish(),
+			Self::Add { by, .. } => f.debug_struct("Conversion::Add").field("by", by).finish(),
+			Self::Sub { by, .. } => f.debug_struct("Conversion::Sub").field("by", by).finish(),
+			Self::Fun { fun, .. } => f.debug_struct("Conversion::Fun").field("fun", fun).finish(),
 		}
 	}
 }
@@ -87,6 +106,23 @@ impl Parse for Conversion {
 				div_token: input.parse()?,
 				by: input.parse()?,
 			})
+		} else if lookahead.peek(kw::add) {
+			Ok(Self::Add {
+				add_token: input.parse()?,
+				by: input.parse()?,
+			})
+		} else if lookahead.peek(kw::sub) {
+			Ok(Self::Sub {
+				sub_token: input.parse()?,
+				by: input.parse()?,
+			})
+		} else if lookahead.peek(kw::fun) {
+			let content;
+			Ok(Self::Fun {
+				fun_token: input.parse()?,
+				paren_token: parenthesized!(content in input),
+				fun: content.parse()?,
+			})
 		} else  {
 			Err(lookahead.error())
 		}
@@ -98,6 +134,9 @@ impl ToTokens for Conversion {
 		match self {
 			Self::Mul { by, .. } => output.extend(quote! { |x| x * #by }),
 			Self::Div { by, .. } => output.extend(quote! { |x| x / #by }),
+			Self::Add { by, .. } => output.extend(quote! { |x| x + #by }),
+			Self::Sub { by, .. } => output.extend(quote! { |x| x - #by }),
+			Self::Fun { fun, .. } => output.extend(quote! {#fun}),
 		}
 	}
 }
@@ -181,6 +220,9 @@ impl ConcreteConversion {
 		match conversion {
 			Conversion::Mul{ mul_token, by } => Some(Self { input_unit: output_unit.clone(), output_unit: input_unit.clone(), conversion: Conversion::Div{div_token: kw::div(mul_token.span), by: by.clone()}  }),
 			Conversion::Div{ div_token, by } => Some(Self { input_unit: output_unit.clone(), output_unit: input_unit.clone(), conversion: Conversion::Mul{mul_token: kw::mul(div_token.span), by: by.clone()}  }),
+			Conversion::Add{ add_token, by } => Some(Self { input_unit: output_unit.clone(), output_unit: input_unit.clone(), conversion: Conversion::Sub{sub_token: kw::sub(add_token.span), by: by.clone()}  }),
+			Conversion::Sub{ sub_token, by } => Some(Self { input_unit: output_unit.clone(), output_unit: input_unit.clone(), conversion: Conversion::Add{add_token: kw::add(sub_token.span), by: by.clone()}  }),
+			Conversion::Fun {..} => None,
 		}
 	}
 }
