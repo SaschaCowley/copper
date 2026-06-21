@@ -3,6 +3,10 @@ name = "copper"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+path = "src/main.rs"
+name = "cu"
+
 [dependencies]
 clap = { version = "4.6.1", default-features = false, features=["std", "derive", "help", "usage", "error-context"] }
 libcopper = { version = "0.1.0", path = "libcopper" }
