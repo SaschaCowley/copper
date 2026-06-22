@@ -2,7 +2,9 @@ use std::{
 	collections::{HashMap, HashSet, VecDeque},
 	sync::LazyLock,
 };
+
 use copper_macros::make_table;
+use log::debug;
 use strum_macros::{EnumMessage, EnumString};
 
 // const QUETTA: f64 = 1e30; // Q
@@ -162,7 +164,7 @@ pub fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result
 	let Some(conversion_path) = find_conversion_path(&input_unit, &output_unit) else {
 		return Err("Cannot convert those units.");
 	};
-	println!("{conversion_path:?}");
+	debug!("{conversion_path:?}");
 	Ok(apply_conversion(amount, conversion_path))
 }
 
@@ -171,9 +173,9 @@ fn apply_conversion(amount: f64, conversion_path: Vec<Unit>) -> f64 {
 	for i in 0..conversion_path.len() - 1 {
 		let input_unit = conversion_path[i];
 		let output_unit = conversion_path[i + 1];
-		print!("{amount} {input_unit} = ");
-		amount = CONVERSIONS[&input_unit][&output_unit](amount);
-		println!("{amount} {output_unit}");
+		let new_amount = CONVERSIONS[&input_unit][&output_unit](amount);
+		debug!("{amount}{input_unit} = {new_amount}{output_unit}");
+		amount = new_amount;
 	}
 	amount
 }

@@ -1,5 +1,8 @@
+use std::io::Write;
+
 use clap::Parser;
 use libcopper::{Unit, do_conversion};
+use log::{LevelFilter, info};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -12,12 +15,31 @@ struct Cli {
 	/// Output unit
 	#[arg(id = "TO")]
 	output_unit: Unit,
+	/// Output verbosity
+	#[arg(short, long, action = clap::ArgAction::Count)]
+	verbosity: u8,
 }
 
 fn main() -> Result<(), &'static str> {
 	let cli = Cli::parse();
-	println!("Converting {}  {} to {}", cli.quantity, cli.input_unit, cli.output_unit);
+	env_logger::Builder::new()
+		.filter(
+			None,
+			match cli.verbosity {
+				0..=1 => LevelFilter::Error,
+				2 => LevelFilter::Info,
+				3.. => LevelFilter::Debug,
+			},
+		)
+		.format(|buf, record| writeln!(buf, "{}", record.args()))
+		.init();
+
+	info!("Converting {}{} to {}", cli.quantity, cli.input_unit, cli.output_unit);
 	let result = do_conversion(cli.quantity, cli.input_unit, cli.output_unit)?;
-	println!("{result}");
+	if cli.verbosity == 0 {
+		println!("{result}");
+	} else {
+		println!("{}{} = {}{}", cli.quantity, cli.input_unit, result, cli.output_unit);
+	}
 	Ok(())
 }
