@@ -40,29 +40,29 @@ const MILLI: f64 = 1e-3; // m
 pub enum Unit {
 	// Length
 	// Metric
-	#[strum(serialize = "mm", to_string = "mm", message = "millimetres")]
+	#[strum(serialize = "mm", message = "millimetres")]
 	Millimetre,
-	#[strum(serialize = "cm", to_string = "cm", message = "centimetres")]
+	#[strum(serialize = "cm", message = "centimetres")]
 	Centimetre,
-	#[strum(serialize = "m", to_string = "m", message = "metres")]
+	#[strum(serialize = "m", message = "metres")]
 	Metre,
-	#[strum(serialize = "km", to_string = "km", message = "kilometres")]
+	#[strum(serialize = "km", message = "kilometres")]
 	Kilometre,
 	// Imperial
 	#[strum(serialize = "in", to_string = "″", message = "inches")]
 	Inch,
 	#[strum(serialize = "ft", to_string = "′", message = "feet")]
 	Foot,
-	#[strum(serialize = "yd", to_string = "yd", message = "yards")]
+	#[strum(serialize = "yd", message = "yards")]
 	Yard,
-	#[strum(serialize = "mi", to_string = "miles")]
+	#[strum(serialize = "mi", message = "miles")]
 	Mile,
 
 	// Temperature
 	// Metric
 	#[strum(serialize = "C", to_string = "°C", message = "degrees celsius")]
 	Celsius,
-	#[strum(serialize = "K", to_string = "K", message = "kelvin")]
+	#[strum(serialize = "K", message = "kelvins")]
 	Kelvin,
 	// Imperial
 	#[strum(serialize = "F", to_string = "°F", message = "degrees fahrenheit")]
@@ -71,7 +71,7 @@ pub enum Unit {
 	Rankine,
 
 	// Data
-	#[strum(serialize = "b", to_string = "bits")]
+	#[strum(serialize = "b", message = "bits")]
 	Bit,
 	#[strum(serialize = "B", to_string = "bytes")]
 	Byte,
