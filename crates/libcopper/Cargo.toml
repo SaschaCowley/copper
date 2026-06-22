@@ -1,0 +1,9 @@
+[package]
+name = "libcopper"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+copper_macros = { path = "../macros" }
+strum = { version = "0.28.0", features = ["derive"] }
+strum_macros = "0.28.0"

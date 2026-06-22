@@ -2,9 +2,7 @@ use std::{
 	collections::{HashMap, HashSet, VecDeque},
 	sync::LazyLock,
 };
-
-use clap::Parser;
-use libcopper::make_table;
+use copper_macros::make_table;
 use strum_macros::{EnumMessage, EnumString};
 
 // const QUETTA: f64 = 1e30; // Q
@@ -37,7 +35,7 @@ const MILLI: f64 = 1e-3; // m
 // const QUECTO: f64 = 1e-30; // q
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, EnumMessage, strum_macros::Display)]
-enum Unit {
+pub enum Unit {
 	// Length
 	// Metric
 	#[strum(serialize = "mm", to_string = "mm", message = "millimetres")]
@@ -160,7 +158,7 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 	}
 });
 
-fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, &'static str> {
+pub fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, &'static str> {
 	let Some(conversion_path) = find_conversion_path(&input_unit, &output_unit) else {
 		return Err("Cannot convert those units.");
 	};
@@ -204,25 +202,4 @@ fn find_conversion_path(input_unit: &Unit, output_unit: &Unit) -> Option<Vec<Uni
 		}
 	}
 	None
-}
-
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Cli {
-	/// Quantity to convert
-	quantity: f64,
-	/// Input unit
-	#[arg(id = "FROM")]
-	input_unit: Unit,
-	/// Output unit
-	#[arg(id = "TO")]
-	output_unit: Unit,
-}
-
-fn main() -> Result<(), &'static str> {
-	let cli = Cli::parse();
-	println!("Converting {}  {} to {}", cli.quantity, cli.input_unit, cli.output_unit);
-	let result = do_conversion(cli.quantity, cli.input_unit, cli.output_unit)?;
-	println!("{result}");
-	Ok(())
 }
