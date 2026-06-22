@@ -14,13 +14,13 @@ use strum_macros::{EnumMessage, EnumString};
 // const EXA: f64 = 1e18; // E
 // const PETA: f64 = 1e15; // P
 const TERA: f64 = 1e12; // T
-const TEBI: f64 = (1i64 << 40) as f64; // T
+const TEBI: f64 = (1i64 << 40) as f64; // Ti
 const GIGA: f64 = 1e9; // G
-const GIBI: f64 = (1 << 30) as f64; // G
+const GIBI: f64 = (1 << 30) as f64; // Gi
 const MEGA: f64 = 1e6; // M
-const MEBI: f64 = (1 << 20) as f64; // M
+const MEBI: f64 = (1 << 20) as f64; // Mi
 const KILO: f64 = 1e3; // k
-const KIBI: f64 = (1 << 10) as f64;
+const KIBI: f64 = (1 << 10) as f64; // Ki
 // const HECTO: f64 = 1e2; // h
 // const DECA: f64 = 1e1 ; // da
 // const DECI: f64 = 1e-1 ; // d

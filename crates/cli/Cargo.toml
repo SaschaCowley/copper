@@ -1,5 +1,5 @@
 [package]
-name = "copper"
+name = "cli"
 version.workspace = true
 edition.workspace = true
 
