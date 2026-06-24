@@ -6,6 +6,7 @@ use std::{
 use copper_macros::make_table;
 use log::debug;
 use strum_macros::{EnumMessage, EnumString};
+use thiserror::Error;
 
 // const QUETTA: f64 = 1e30; // Q
 // const RONNA: f64 = 1e27; // R
@@ -35,6 +36,12 @@ const MILLI: f64 = 1e-3; // m
 // const YOCTO: f64 = 1e-24; // y
 // const RONTO: f64 = 1e-27; // r
 // const QUECTO: f64 = 1e-30; // q
+
+#[derive(Error, Debug, Clone, Eq, PartialEq)]
+pub enum ConversionError {
+	#[error("Cannot convert from {from} to {to}: no conversion path found.")]
+	IncompatibleUnits { from: Unit, to: Unit },
+}
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, EnumMessage, strum_macros::Display)]
 pub enum Unit {
@@ -160,9 +167,9 @@ static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = Laz
 	}
 });
 
-pub fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, &'static str> {
+pub fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, ConversionError> {
 	let Some(conversion_path) = find_conversion_path(&input_unit, &output_unit) else {
-		return Err("Cannot convert those units.");
+		return Err(ConversionError::IncompatibleUnits { from: input_unit, to: output_unit });
 	};
 	debug!("{conversion_path:?}");
 	Ok(apply_conversion(amount, conversion_path))
