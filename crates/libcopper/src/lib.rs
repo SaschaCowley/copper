@@ -11,7 +11,7 @@ use thiserror::Error;
 declare_units! {
 	pub Units (
 		metric("metre", "metres", "m"),
-		metric_pos("byte", "bytes", "B"),
+		data("byte", "bytes", "B"),
 
 		("yard", "yards", "yd"),
 		("inch", "inches", "″", "in"),

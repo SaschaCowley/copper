@@ -10,7 +10,7 @@ use syn::{
 };
 
 use crate::{
-	multipliers::{Multiplier, NEGATIVE_METRIC_MULTIPLIERS, POSITIVE_METRIC_MULTIPLIERS},
+	multipliers::{DATA_METRIC_MULTIPLIERS, IEC_MULTIPLIERS, Multiplier, NONDATA_METRIC_MULTIPLIERS},
 	token::kw,
 };
 
@@ -68,14 +68,14 @@ impl Parse for SingleUnit {
 
 enum CompositeType {
 	Metric(#[allow(dead_code)] kw::metric),
-	PositiveMetric(#[allow(dead_code)] kw::metric_pos),
+	Data(#[allow(dead_code)] kw::data),
 }
 
 impl CompositeType {
 	fn multipliers(&self) -> Box<dyn Iterator<Item = &Multiplier> + '_> {
 		match self {
-			Self::Metric(_) => Box::new(POSITIVE_METRIC_MULTIPLIERS.iter().chain(NEGATIVE_METRIC_MULTIPLIERS.iter())),
-			Self::PositiveMetric(_) => Box::new(POSITIVE_METRIC_MULTIPLIERS.iter()),
+			Self::Metric(_) => Box::new(DATA_METRIC_MULTIPLIERS.iter().chain(NONDATA_METRIC_MULTIPLIERS.iter())),
+			Self::Data(_) => Box::new(DATA_METRIC_MULTIPLIERS.iter().chain(IEC_MULTIPLIERS.iter())),
 		}
 	}
 }
@@ -85,8 +85,8 @@ impl Parse for CompositeType {
 		let lookahead = input.lookahead1();
 		if lookahead.peek(kw::metric) {
 			Ok(Self::Metric(input.parse()?))
-		} else if lookahead.peek(kw::metric_pos) {
-			Ok(Self::PositiveMetric(input.parse()?))
+		} else if lookahead.peek(kw::data) {
+			Ok(Self::Data(input.parse()?))
 		} else {
 			Err(lookahead.error())
 		}
@@ -176,7 +176,7 @@ enum Unit {
 impl Parse for Unit {
 	fn parse(input: ParseStream) -> Result<Self> {
 		let lookahead = input.lookahead1();
-		if lookahead.peek(kw::metric) || lookahead.peek(kw::metric_pos) {
+		if lookahead.peek(kw::metric) || lookahead.peek(kw::data) {
 			Ok(Self::Composite(input.parse()?))
 		} else if lookahead.peek(token::Paren) {
 			Ok(Self::Single(input.parse()?))
