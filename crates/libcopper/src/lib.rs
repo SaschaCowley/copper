@@ -3,10 +3,19 @@ use std::{
 	sync::LazyLock,
 };
 
-use copper_macros::make_table;
+use copper_macros::{declare_units, make_table};
 use log::debug;
 use strum_macros::{EnumMessage, EnumString};
 use thiserror::Error;
+
+declare_units! {
+	pub Units (
+		// metric("metre", "metres", "m"),
+		("yard", "yards", "yd"),
+		("inch", "inches", "″", "in"),
+		(Celsius, "degree celsius", "degrees celsius", "°C", "C")
+	)
+}
 
 // const QUETTA: f64 = 1e30; // Q
 // const RONNA: f64 = 1e27; // R
@@ -41,6 +50,12 @@ const MILLI: f64 = 1e-3; // m
 pub enum ConversionError {
 	#[error("Cannot convert from {from} to {to}: no conversion path found.")]
 	IncompatibleUnits { from: Unit, to: Unit },
+}
+
+#[derive(Error, Debug)]
+pub enum ParseUnitError {
+	#[error("Unknown unit: no unit with symbol \"{0}\" found.")]
+	VariantNotFound(String),
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, EnumMessage, strum_macros::Display)]
