@@ -10,17 +10,7 @@ use syn::{
 	token,
 };
 
-mod punc {
-	syn::custom_punctuation!(ThinArrow, ->);
-}
-
-mod kw {
-	syn::custom_keyword!(mul);
-	syn::custom_keyword!(div);
-	syn::custom_keyword!(add);
-	syn::custom_keyword!(sub);
-	syn::custom_keyword!(fun);
-}
+use crate::token::{kw, punc};
 
 #[derive(Clone, Debug)]
 struct Unit {

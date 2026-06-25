@@ -9,11 +9,10 @@ use syn::{
 	token,
 };
 
-use crate::multipliers::{METRIC_MULTIPLIERS, Multiplier};
-
-mod kw {
-	syn::custom_keyword!(metric);
-}
+use crate::{
+	multipliers::{METRIC_MULTIPLIERS, Multiplier},
+	token::kw,
+};
 
 fn name_to_ident(name: &str) -> String {
 	let mut chars = name.chars();
