@@ -13,7 +13,8 @@ impl Multiplier {
 	}
 }
 
-pub(crate) const METRIC_MULTIPLIERS: [Multiplier; 24] = [
+// pub(crate) const METRIC_MULTIPLIERS: [Multiplier; 24] = [
+pub(crate) const POSITIVE_METRIC_MULTIPLIERS: [Multiplier; 10] = [
 	Multiplier("quetta", &["Q"], 1e30),
 	Multiplier("ronna", &["R"], 1e27),
 	Multiplier("yotta", &["Y"], 1e24),
@@ -24,6 +25,9 @@ pub(crate) const METRIC_MULTIPLIERS: [Multiplier; 24] = [
 	Multiplier("giga", &["G"], 1e9),
 	Multiplier("mega", &["M"], 1e6),
 	Multiplier("kilo", &["k"], 1e3),
+];
+
+pub(crate) const NEGATIVE_METRIC_MULTIPLIERS: [Multiplier; 14] = [
 	Multiplier("hecto", &["h"], 1e2),
 	Multiplier("deca", &["da"], 1e1),
 	Multiplier("deci", &["d"], 1e-1),

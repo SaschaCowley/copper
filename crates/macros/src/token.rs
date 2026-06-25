@@ -9,4 +9,5 @@ pub(crate) mod kw {
 	syn::custom_keyword!(sub);
 	syn::custom_keyword!(fun);
 	syn::custom_keyword!(metric);
+	syn::custom_keyword!(metric_pos);
 }

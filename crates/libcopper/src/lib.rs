@@ -10,7 +10,9 @@ use thiserror::Error;
 
 declare_units! {
 	pub Units (
-		// metric("metre", "metres", "m"),
+		metric("metre", "metres", "m"),
+		metric_pos("byte", "bytes", "B"),
+
 		("yard", "yards", "yd"),
 		("inch", "inches", "″", "in"),
 		(Celsius, "degree celsius", "degrees celsius", "°C", "C")

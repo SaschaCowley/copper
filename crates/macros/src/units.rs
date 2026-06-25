@@ -10,7 +10,7 @@ use syn::{
 };
 
 use crate::{
-	multipliers::{METRIC_MULTIPLIERS, Multiplier},
+	multipliers::{Multiplier, NEGATIVE_METRIC_MULTIPLIERS, POSITIVE_METRIC_MULTIPLIERS},
 	token::kw,
 };
 
@@ -33,7 +33,7 @@ impl Parse for IdentAndName {
 }
 
 #[derive(Clone)]
-struct NormalUnit {
+struct SingleUnit {
 	#[allow(dead_code)]
 	paren_token: token::Paren,
 	ident: Ident,
@@ -48,7 +48,7 @@ struct NormalUnit {
 	symbols: Punctuated<LitStr, Token!(,)>,
 }
 
-impl Parse for NormalUnit {
+impl Parse for SingleUnit {
 	fn parse(input: ParseStream<'_>) -> Result<Self> {
 		let content;
 		let paren_token = parenthesized!(content in input);
@@ -66,9 +66,36 @@ impl Parse for NormalUnit {
 	}
 }
 
-struct MetricUnit {
+enum CompositeType {
+	Metric(#[allow(dead_code)] kw::metric),
+	PositiveMetric(#[allow(dead_code)] kw::metric_pos),
+}
+
+impl CompositeType {
+	fn multipliers(&self) -> Box<dyn Iterator<Item = &Multiplier> + '_> {
+		match self {
+			Self::Metric(_) => Box::new(POSITIVE_METRIC_MULTIPLIERS.iter().chain(NEGATIVE_METRIC_MULTIPLIERS.iter())),
+			Self::PositiveMetric(_) => Box::new(POSITIVE_METRIC_MULTIPLIERS.iter()),
+		}
+	}
+}
+
+impl Parse for CompositeType {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let lookahead = input.lookahead1();
+		if lookahead.peek(kw::metric) {
+			Ok(Self::Metric(input.parse()?))
+		} else if lookahead.peek(kw::metric_pos) {
+			Ok(Self::PositiveMetric(input.parse()?))
+		} else {
+			Err(lookahead.error())
+		}
+	}
+}
+
+struct CompositeUnit {
 	#[allow(dead_code)]
-	metric_token: kw::metric,
+	composite_token: CompositeType,
 	paren_token: token::Paren,
 	ident: Ident,
 	#[allow(dead_code)]
@@ -82,9 +109,9 @@ struct MetricUnit {
 	symbol: LitStr,
 }
 
-impl MetricUnit {
-	fn multiply(&self, multiplier: &Multiplier) -> NormalUnit {
-		NormalUnit {
+impl CompositeUnit {
+	fn multiply(&self, multiplier: &Multiplier) -> SingleUnit {
+		SingleUnit {
 			paren_token: self.paren_token,
 			ident: Ident::new(
 				&name_to_ident(&(multiplier.name().to_owned() + &self.ident.to_string().to_lowercase())),
@@ -103,8 +130,8 @@ impl MetricUnit {
 		}
 	}
 
-	fn base(&self) -> NormalUnit {
-		NormalUnit {
+	fn base(&self) -> SingleUnit {
+		SingleUnit {
 			paren_token: self.paren_token,
 			ident: self.ident.clone(),
 			comma_token1: self.comma_token1,
@@ -116,19 +143,19 @@ impl MetricUnit {
 		}
 	}
 
-	fn expand(&self) -> Punctuated<NormalUnit, Token!(,)> {
-		once(self.base()).chain(METRIC_MULTIPLIERS.iter().map(|m| self.multiply(m))).collect()
+	fn expand(&self) -> Punctuated<SingleUnit, Token!(,)> {
+		once(self.base()).chain(self.composite_token.multipliers().map(|m| self.multiply(m))).collect()
 	}
 }
 
-impl Parse for MetricUnit {
+impl Parse for CompositeUnit {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let metric_token = input.parse()?;
+		let composite_token = input.parse()?;
 		let content;
 		let paren_token = parenthesized!(content in input);
 		let IdentAndName(ident, comma_token1, name) = content.parse()?;
 		Ok(Self {
-			metric_token,
+			composite_token,
 			paren_token,
 			ident,
 			comma_token1,
@@ -142,17 +169,17 @@ impl Parse for MetricUnit {
 }
 
 enum Unit {
-	Normal(NormalUnit),
-	Metric(MetricUnit),
+	Single(SingleUnit),
+	Composite(CompositeUnit),
 }
 
 impl Parse for Unit {
 	fn parse(input: ParseStream) -> Result<Self> {
 		let lookahead = input.lookahead1();
-		if lookahead.peek(kw::metric) {
-			Ok(Self::Metric(input.parse()?))
+		if lookahead.peek(kw::metric) || lookahead.peek(kw::metric_pos) {
+			Ok(Self::Composite(input.parse()?))
 		} else if lookahead.peek(token::Paren) {
-			Ok(Self::Normal(input.parse()?))
+			Ok(Self::Single(input.parse()?))
 		} else {
 			Err(lookahead.error())
 		}
@@ -180,11 +207,11 @@ impl Parse for UnitDecls {
 }
 
 impl UnitDecls {
-	fn expand(&self) -> Punctuated<NormalUnit, Token!(,)> {
-		let mut units = Punctuated::<NormalUnit, Token!(,)>::new();
+	fn expand(&self) -> Punctuated<SingleUnit, Token!(,)> {
+		let mut units = Punctuated::<SingleUnit, Token!(,)>::new();
 		self.units.iter().for_each(|unit| match unit {
-			Unit::Normal(u) => units.push((*u).clone()),
-			Unit::Metric(u) => units.extend(u.expand()),
+			Unit::Single(u) => units.push((*u).clone()),
+			Unit::Composite(u) => units.extend(u.expand()),
 		});
 		units
 	}
@@ -198,7 +225,7 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 	let mut symbol_arms = Vec::new();
 	let mut parse_arms = Vec::new();
 	for unit in input.expand() {
-		let NormalUnit { ident, name, plural, symbols, .. } = unit;
+		let SingleUnit { ident, name, plural, symbols, .. } = unit;
 		enum_vars.push(ident.clone());
 		name_arms.push(quote! {Self::#ident => #name});
 		plural_arms.push(quote! {Self::#ident => #plural});
