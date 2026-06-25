@@ -235,6 +235,7 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 	}
 	let UnitDecls { vis, ident, .. } = input;
 	let expanded = quote! {
+		#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 		#vis enum #ident {
 			#(#enum_vars),*
 		}

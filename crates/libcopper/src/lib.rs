@@ -5,19 +5,7 @@ use std::{
 
 use copper_macros::{declare_units, make_table};
 use log::debug;
-use strum_macros::{EnumMessage, EnumString};
 use thiserror::Error;
-
-declare_units! {
-	pub Units (
-		metric("metre", "metres", "m"),
-		data("byte", "bytes", "B"),
-
-		("yard", "yards", "yd"),
-		("inch", "inches", "″", "in"),
-		(Celsius, "degree celsius", "degrees celsius", "°C", "C")
-	)
-}
 
 // const QUETTA: f64 = 1e30; // Q
 // const RONNA: f64 = 1e27; // R
@@ -60,79 +48,25 @@ pub enum ParseUnitError {
 	VariantNotFound(String),
 }
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone, Copy, EnumString, EnumMessage, strum_macros::Display)]
-pub enum Unit {
-	// Length
-	// Metric
-	#[strum(serialize = "mm", message = "millimetres")]
-	Millimetre,
-	#[strum(serialize = "cm", message = "centimetres")]
-	Centimetre,
-	#[strum(serialize = "m", message = "metres")]
-	Metre,
-	#[strum(serialize = "km", message = "kilometres")]
-	Kilometre,
-	// Imperial
-	#[strum(serialize = "in", to_string = "″", message = "inches")]
-	Inch,
-	#[strum(serialize = "ft", to_string = "′", message = "feet")]
-	Foot,
-	#[strum(serialize = "yd", message = "yards")]
-	Yard,
-	#[strum(serialize = "mi", message = "miles")]
-	Mile,
+declare_units! {
+	pub Unit (
+		// Length
+		metric("metre", "metres", "m"),
+		("inch", "inches", "″", "in"),
+		("foot", "feet", "′", "ft"),
+		("yard", "yards", "yd"),
+		("mile", "miles", "mi"),
 
-	// Temperature
-	// Metric
-	#[strum(serialize = "C", to_string = "°C", message = "degrees celsius")]
-	Celsius,
-	#[strum(serialize = "K", message = "kelvins")]
-	Kelvin,
-	// Imperial
-	#[strum(serialize = "F", to_string = "°F", message = "degrees fahrenheit")]
-	Fahrenheit,
-	#[strum(serialize = "R", to_string = "°R", message = "degrees Rankine")]
-	Rankine,
+		// Data
+		data("byte", "bytes", "B"),
+		data("bit", "bits", "b"),
 
-	// Data
-	#[strum(serialize = "b", message = "bits")]
-	Bit,
-	#[strum(serialize = "B", to_string = "bytes")]
-	Byte,
-	// Metric
-	#[strum(serialize = "kb", to_string = "kilobits")]
-	Kilobit,
-	#[strum(serialize = "kB", to_string = "kilobytes")]
-	Kilobyte,
-	#[strum(serialize = "Mb", to_string = "megabits")]
-	Megabit,
-	#[strum(serialize = "MB", to_string = "megabytes")]
-	Megabyte,
-	#[strum(serialize = "Gb", to_string = "gigabits")]
-	Gigabit,
-	#[strum(serialize = "GB", to_string = "gigabytes")]
-	Gigabyte,
-	#[strum(serialize = "Tb", to_string = "terabits")]
-	Terabit,
-	#[strum(serialize = "TB", to_string = "terabytes")]
-	Terabyte,
-	// IEC
-	#[strum(serialize = "Kib", to_string = "kibibits")]
-	Kibibit,
-	#[strum(serialize = "KiB", to_string = "kibibytes")]
-	Kibibyte,
-	#[strum(serialize = "Mib", to_string = "mebibits")]
-	Mebibit,
-	#[strum(serialize = "MiB", to_string = "mebibytes")]
-	Mebibyte,
-	#[strum(serialize = "Gib", to_string = "gibibits")]
-	Gibibit,
-	#[strum(serialize = "GiB", to_string = "gibibytes")]
-	Gibibyte,
-	#[strum(serialize = "Tib", to_string = "tebibits")]
-	Tebibit,
-	#[strum(serialize = "TiB", to_string = "tebibytes")]
-	Tebibyte,
+		// Temperature
+		(Celsius, "degree celsius", "degrees celsius", "°C", "C"),
+		("kelvin", "kelvins", "K"),
+		(Fahrenheit, "degree fahrenheit", "degrees fahrenheit", "°F", "F"),
+		(Rankine, "degree Rankine", "degrees Rankine", "°R", "R"),
+	)
 }
 
 type ConversionFunc = fn(f64) -> f64;
