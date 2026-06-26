@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt};
 use proc_macro2::{TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::{
-	Token, braced, parenthesized,
+	Ident, Path, Token, braced, parenthesized,
 	parse::{Parse, ParseStream, Result},
 	parse_macro_input,
 	punctuated::Punctuated,
@@ -271,4 +271,113 @@ pub(crate) fn make_table_impl(input: proc_macro::TokenStream) -> proc_macro::Tok
 	}
 	let expanded = quote! {HashMap::from([#(#branches),*])};
 	proc_macro::TokenStream::from(expanded)
+}
+
+struct Output {
+	unit: Ident,
+	arrow_token: Token!(=>),
+	conversion: Conversion,
+}
+
+impl Parse for Output {
+	fn parse(input: ParseStream) -> Result<Self> {
+		Ok(Self { unit: input.parse()?, arrow_token: input.parse()?, conversion: input.parse()? })
+	}
+}
+
+struct SimpleRow {
+	input_unit: Ident,
+	fat_arrow_token: Token!(->),
+	output: Output,
+}
+
+impl Parse for SimpleRow {
+	fn parse(input: ParseStream) -> Result<Self> {
+		Ok(Self { input_unit: input.parse()?, fat_arrow_token: input.parse()?, output: input.parse()? })
+	}
+}
+
+struct CompositeRow {
+	input_unit: Ident,
+	fat_arrow_token: Token!(->),
+	brace_token: token::Brace,
+	outputs: Punctuated<Output, Token!(,)>,
+}
+
+impl Parse for CompositeRow {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let content;
+		Ok(Self {
+			input_unit: input.parse()?,
+			fat_arrow_token: input.parse()?,
+			brace_token: braced!(content in input),
+			outputs: content.call(Punctuated::parse_terminated)?,
+		})
+	}
+}
+
+enum Derivation {
+	Metric(kw::metric),
+	Data(kw::data),
+}
+
+impl Parse for Derivation {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let lookahead = input.lookahead1();
+		if lookahead.peek(kw::metric) {
+			Ok(Self::Metric(input.parse()?))
+		} else if lookahead.peek(kw::data) {
+			Ok(Self::Data(input.parse()?))
+		} else {
+			Err(lookahead.error())
+		}
+	}
+}
+
+struct DerivedRow {
+	derivation: Derivation,
+	paren_token: token::Paren,
+	idents: Punctuated<Ident, Token![,]>,
+}
+
+impl Parse for DerivedRow {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let content;
+		Ok(Self {
+			derivation: input.parse()?,
+			paren_token: parenthesized!(content in input),
+			idents: content.call(Punctuated::parse_terminated)?,
+		})
+	}
+}
+
+enum Row {
+	Simple(SimpleRow),
+	Composite(CompositeRow),
+	Derived(DerivedRow),
+}
+
+impl Parse for Row {
+	fn parse(input: ParseStream) -> Result<Self> {
+		unimplemented!();
+	}
+}
+
+struct Table {
+	name: Path,
+	sep_token: Token!(::),
+	brace_token: token::Brace,
+	rows: Punctuated<Row, Token!(,)>,
+}
+
+impl Parse for Table {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let content;
+		Ok(Self {
+			name: Path::parse_mod_style(input)?,
+			sep_token: input.parse()?,
+			brace_token: braced!(content in input),
+			rows: content.call(Punctuated::parse_terminated)?,
+		})
+	}
 }
