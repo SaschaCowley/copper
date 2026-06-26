@@ -10,7 +10,7 @@ use syn::{
 	token,
 };
 
-use crate::token::{kw, punc};
+use crate::kw;
 
 #[derive(Clone, Debug)]
 struct Unit {
@@ -172,17 +172,17 @@ impl Parse for ConversionRHSs {
 struct ConversionRow {
 	input_unit: Unit,
 	#[allow(dead_code)]
-	arrow_token: punc::ThinArrow,
+	arrow_token: Token!(->),
 	outputs: OutputType,
 }
 
 impl Parse for ConversionRow {
 	fn parse(input: ParseStream) -> Result<Self> {
 		let mut input_unit = Unit::new();
-		while !input.is_empty() && !input.peek(punc::ThinArrow) {
+		while !input.is_empty() && !input.peek(Token!(->)) {
 			input_unit.extend(input.parse::<TokenTree>());
 		}
-		let arrow_token = input.parse::<punc::ThinArrow>()?;
+		let arrow_token = input.parse::<Token!(->)>()?;
 		let outputs = input.parse::<OutputType>()?;
 		Ok(Self { input_unit, arrow_token, outputs })
 	}

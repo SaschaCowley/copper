@@ -10,8 +10,8 @@ use syn::{
 };
 
 use crate::{
+	kw,
 	multipliers::{DATA_METRIC_MULTIPLIERS, IEC_MULTIPLIERS, Multiplier, NONDATA_METRIC_MULTIPLIERS},
-	token::kw,
 };
 
 fn name_to_ident(name: &str) -> String {
