@@ -3,9 +3,31 @@ use std::{
 	sync::LazyLock,
 };
 
-use copper_macros::{declare_units, make_table};
+use copper_macros::{declare_units, make_table, make_table2};
 use log::debug;
 use thiserror::Error;
+
+make_table2! {
+	pub CONVERSIONS<ConversionFunc> Unit {
+		data(Bit, Byte),
+		metric(Metre),
+		Metre -> Yard => div 0.9144,
+		Yard -> {
+			Inch => mul 36.0,
+			Foot =>  mul 3.0,
+			Mile =>  div 1760.0,
+		},
+
+		Celsius -> {
+			Kelvin => add 273.15,
+			Fahrenheit => fun(|c| 9.0*c/5.0 + 32.0),
+		},
+		Fahrenheit -> {
+			Rankine => add 459.67,
+			Celsius => fun(|f| (f-32.0)*5.0/9.0),
+		},
+	}
+}
 
 // const QUETTA: f64 = 1e30; // Q
 // const RONNA: f64 = 1e27; // R
@@ -71,52 +93,52 @@ declare_units! {
 
 type ConversionFunc = fn(f64) -> f64;
 
-static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = LazyLock::new(|| {
-	make_table! {
-		Unit::Metre -> {
-			Unit::Yard => div 0.9144,
-			Unit::Millimetre => div MILLI,
-			Unit::Centimetre => div CENTI,
-			Unit::Kilometre => div KILO,
-		},
-		Unit::Yard -> {
-			Unit::Inch => mul 36.0,
-			Unit::Foot =>  mul 3.0,
-			Unit::Mile =>  div 1760.0,
-		},
+// static CONVERSIONS: LazyLock<HashMap<Unit, HashMap<Unit, ConversionFunc>>> = LazyLock::new(|| {
+// make_table! {
+// Unit::Metre -> {
+// Unit::Yard => div 0.9144,
+// Unit::Millimetre => div MILLI,
+// Unit::Centimetre => div CENTI,
+// Unit::Kilometre => div KILO,
+// },
+// Unit::Yard -> {
+// Unit::Inch => mul 36.0,
+// Unit::Foot =>  mul 3.0,
+// Unit::Mile =>  div 1760.0,
+// },
 
-		Unit::Celsius -> {
-			Unit::Kelvin => add 273.15,
-			Unit::Fahrenheit => fun(|c| 9.0*c/5.0 + 32.0),
-		},
-		Unit::Fahrenheit -> {
-			Unit::Rankine => add 459.67,
-			Unit::Celsius => fun(|f| (f-32.0)*5.0/9.0),
-		},
+// Unit::Celsius -> {
+// Unit::Kelvin => add 273.15,
+// Unit::Fahrenheit => fun(|c| 9.0*c/5.0 + 32.0),
+// },
+// Unit::Fahrenheit -> {
+// Unit::Rankine => add 459.67,
+// Unit::Celsius => fun(|f| (f-32.0)*5.0/9.0),
+// },
 
-		Unit::Bit -> {
-			Unit::Kilobit => div KILO,
-			Unit::Kibibit => div KIBI,
-			Unit::Megabit => div MEGA,
-			Unit::Mebibit => div MEBI,
-			Unit::Gigabit => div GIGA,
-			Unit::Gibibit => div GIBI,
-			Unit::Terabit => div TERA,
-			Unit::Tebibit => div TEBI,
-		},
-		Unit::Byte -> {
-			Unit::Bit => mul 8.0,
-			Unit::Kilobyte => div KILO,
-			Unit::Kibibyte => div KIBI,
-			Unit::Megabyte => div MEGA,
-			Unit::Mebibyte => div MEBI,
-			Unit::Gigabyte => div GIGA,
-			Unit::Gibibyte => div GIBI,
-			Unit::Terabyte => div TERA,
-			Unit::Tebibyte => div TEBI,
-		},
-	}
-});
+// Unit::Bit -> {
+// Unit::Kilobit => div KILO,
+// Unit::Kibibit => div KIBI,
+// Unit::Megabit => div MEGA,
+// Unit::Mebibit => div MEBI,
+// Unit::Gigabit => div GIGA,
+// Unit::Gibibit => div GIBI,
+// Unit::Terabit => div TERA,
+// Unit::Tebibit => div TEBI,
+// },
+// Unit::Byte -> {
+// Unit::Bit => mul 8.0,
+// Unit::Kilobyte => div KILO,
+// Unit::Kibibyte => div KIBI,
+// Unit::Megabyte => div MEGA,
+// Unit::Mebibyte => div MEBI,
+// Unit::Gigabyte => div GIGA,
+// Unit::Gibibyte => div GIBI,
+// Unit::Terabyte => div TERA,
+// Unit::Tebibyte => div TEBI,
+// },
+// }
+// });
 
 pub fn do_conversion(amount: f64, input_unit: Unit, output_unit: Unit) -> Result<f64, ConversionError> {
 	let Some(conversion_path) = find_conversion_path(&input_unit, &output_unit) else {

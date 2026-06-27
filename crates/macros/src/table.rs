@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, iter::once};
 use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::{
-	Ident, Path, Token, braced, parenthesized,
+	Ident, Path, Token, Visibility, braced, parenthesized,
 	parse::{self, Parse, ParseStream, Result},
 	parse_macro_input,
 	punctuated::Punctuated,
@@ -422,8 +422,13 @@ impl Parse for Row {
 }
 
 struct Table {
-	name: Path,
-	sep_token: Token!(::),
+	vis: Visibility,
+	name: Ident,
+	lt_token: Token!(<),
+	conv_ty: Path,
+	gt_token: Token!(>),
+	origin: Path,
+	// sep_token: Token!(::),
 	brace_token: token::Brace,
 	rows: Punctuated<Row, Token!(,)>,
 }
@@ -432,8 +437,13 @@ impl Parse for Table {
 	fn parse(input: ParseStream) -> Result<Self> {
 		let content;
 		Ok(Self {
-			name: Path::parse_mod_style(input)?,
-			sep_token: input.parse()?,
+			vis: input.parse()?,
+			name: input.parse()?,
+			lt_token: input.parse()?,
+			conv_ty: input.parse()?,
+			gt_token: input.parse()?,
+			origin: Path::parse_mod_style(input)?,
+			// sep_token: input.parse()?,
 			brace_token: braced!(content in input),
 			rows: content.call(Punctuated::parse_terminated)?,
 		})
@@ -524,4 +534,52 @@ impl IntoIterator for DerivedRow {
 			self.derivation.multipliers().flat_map(move |multiplier| Self::derive(&unit, multiplier))
 		})))
 	}
+}
+
+struct ConversionTable2 {
+	explicits: Vec<ConcreteConversion2>,
+	implicits: Vec<ConcreteConversion2>,
+}
+
+impl Table {
+	fn conversions(self) -> ConversionTable2 {
+		let mut explicits = Vec::new();
+		let mut implicits = Vec::new();
+		for (explicit, implicit) in self.rows.into_iter().flat_map(Row::into_iter) {
+			explicits.extend(explicit);
+			implicits.extend(implicit);
+		}
+		ConversionTable2 { explicits, implicits }
+	}
+}
+
+pub(crate) fn make_table_impl2(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	let mut table = parse_macro_input!(input as Table);
+	let vis = table.vis.clone();
+	let name = table.name.clone();
+	let origin = table.origin.clone();
+	let conv_ty = table.conv_ty.clone();
+	let mut tree: HashMap<Ident, HashMap<Ident, Conversion>> = HashMap::new();
+	let mut conversions = table.conversions();
+	for ConcreteConversion2(input_unit, output_unit, conversion) in
+		conversions.implicits.drain(..).chain(conversions.explicits.drain(..))
+	{
+		tree.entry(input_unit).or_default().insert(output_unit, conversion);
+	}
+	let mut branches = Vec::new();
+	for (input_unit, outputs) in tree {
+		let mut leaves = Vec::new();
+		for (output_unit, conversion) in outputs {
+			leaves.push(quote! { (#origin::#output_unit, (#conversion) as #conv_ty) });
+		}
+		branches.push(quote! {(#origin::#input_unit, HashMap::from([#(#leaves),*]))});
+	}
+	// let expanded = quote! {HashMap::from([#(#branches),*])};
+	let expanded = quote! {
+		#vis static #name: std::sync::LazyLock<std::collections::HashMap<#origin, std::collections::HashMap<#origin, #conv_ty>>> = LazyLock::new(|| {
+			HashMap::from([#(#branches),*])
+		});
+	};
+	// let expanded = quote!{};
+	proc_macro::TokenStream::from(expanded)
 }
