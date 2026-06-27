@@ -572,12 +572,12 @@ pub(crate) fn make_table_impl2(input: proc_macro::TokenStream) -> proc_macro::To
 		for (output_unit, conversion) in outputs {
 			leaves.push(quote! { (#origin::#output_unit, (#conversion) as #conv_ty) });
 		}
-		branches.push(quote! {(#origin::#input_unit, HashMap::from([#(#leaves),*]))});
+		branches.push(quote! {(#origin::#input_unit, ::std::collections::HashMap::from([#(#leaves),*]))});
 	}
 	// let expanded = quote! {HashMap::from([#(#branches),*])};
 	let expanded = quote! {
-		#vis static #name: std::sync::LazyLock<std::collections::HashMap<#origin, std::collections::HashMap<#origin, #conv_ty>>> = LazyLock::new(|| {
-			HashMap::from([#(#branches),*])
+		#vis static #name: ::std::sync::LazyLock<::std::collections::HashMap<#origin, ::std::collections::HashMap<#origin, #conv_ty>>> = ::std::sync::LazyLock::new(|| {
+			::std::collections::HashMap::from([#(#branches),*])
 		});
 	};
 	// let expanded = quote!{};
