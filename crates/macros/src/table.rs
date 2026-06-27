@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, iter::once};
+use std::{collections::HashMap, iter::once};
 
 use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
@@ -42,18 +42,6 @@ enum Conversion {
 	},
 }
 
-impl fmt::Debug for Conversion {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::Mul { by, .. } => f.debug_struct("Conversion::Mul").field("by", by).finish(),
-			Self::Div { by, .. } => f.debug_struct("Conversion::Div").field("by", by).finish(),
-			Self::Add { by, .. } => f.debug_struct("Conversion::Add").field("by", by).finish(),
-			Self::Sub { by, .. } => f.debug_struct("Conversion::Sub").field("by", by).finish(),
-			Self::Fun { fun, .. } => f.debug_struct("Conversion::Fun").field("fun", fun).finish(),
-		}
-	}
-}
-
 impl Parse for Conversion {
 	fn parse(input: ParseStream) -> Result<Self> {
 		let lookahead = input.lookahead1();
@@ -88,6 +76,42 @@ impl ToTokens for Conversion {
 			Self::Fun { fun, .. } => output.extend(quote! {#fun}),
 		}
 	}
+}
+
+struct ConcreteConversion2(Ident, Ident, Conversion);
+
+impl ConcreteConversion2 {
+	fn inverse(&self) -> Option<Self> {
+		let Self(input_unit, output_unit, conversion) = self;
+		match conversion {
+			Conversion::Mul { mul_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Div { div_token: kw::div(mul_token.span), by: by.clone() },
+			)),
+			Conversion::Div { div_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Mul { mul_token: kw::mul(div_token.span), by: by.clone() },
+			)),
+			Conversion::Add { add_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Sub { sub_token: kw::sub(add_token.span), by: by.clone() },
+			)),
+			Conversion::Sub { sub_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Add { add_token: kw::add(sub_token.span), by: by.clone() },
+			)),
+			Conversion::Fun { .. } => None,
+		}
+	}
+}
+
+struct ConversionTable2 {
+	explicits: Vec<ConcreteConversion2>,
+	implicits: Vec<ConcreteConversion2>,
 }
 
 struct SingleOutput {
@@ -152,13 +176,13 @@ impl IntoIterator for Output {
 struct ExplicitRow {
 	input_unit: Ident,
 	#[allow(dead_code)]
-	fat_arrow_token: Token!(->),
+	arrow_token: Token!(->),
 	output: Output,
 }
 
 impl Parse for ExplicitRow {
 	fn parse(input: ParseStream) -> Result<Self> {
-		Ok(Self { input_unit: input.parse()?, fat_arrow_token: input.parse()?, output: input.parse()? })
+		Ok(Self { input_unit: input.parse()?, arrow_token: input.parse()?, output: input.parse()? })
 	}
 }
 
@@ -172,9 +196,9 @@ impl Parse for Derivation {
 	fn parse(input: ParseStream) -> Result<Self> {
 		let lookahead = input.lookahead1();
 		if lookahead.peek(kw::metric) {
-			Ok(Self::Metric(input.parse()?))
+			input.parse().map(Self::Metric)
 		} else if lookahead.peek(kw::data) {
-			Ok(Self::Data(input.parse()?))
+			input.parse().map(Self::Data)
 		} else {
 			Err(lookahead.error())
 		}
@@ -262,44 +286,25 @@ impl Parse for Table {
 			conv_ty: input.parse()?,
 			gt_token: input.parse()?,
 			origin: Path::parse_mod_style(input)?,
-			// sep_token: input.parse()?,
 			brace_token: braced!(content in input),
 			rows: content.call(Punctuated::parse_terminated)?,
 		})
 	}
 }
 
-struct ConcreteConversion2(Ident, Ident, Conversion);
-type ExplicitImplicitConversionPair = (Option<ConcreteConversion2>, Option<ConcreteConversion2>);
-
-impl ConcreteConversion2 {
-	fn inverse(&self) -> Option<Self> {
-		let Self(input_unit, output_unit, conversion) = self;
-		match conversion {
-			Conversion::Mul { mul_token, by } => Some(Self(
-				output_unit.clone(),
-				input_unit.clone(),
-				Conversion::Div { div_token: kw::div(mul_token.span), by: by.clone() },
-			)),
-			Conversion::Div { div_token, by } => Some(Self(
-				output_unit.clone(),
-				input_unit.clone(),
-				Conversion::Mul { mul_token: kw::mul(div_token.span), by: by.clone() },
-			)),
-			Conversion::Add { add_token, by } => Some(Self(
-				output_unit.clone(),
-				input_unit.clone(),
-				Conversion::Sub { sub_token: kw::sub(add_token.span), by: by.clone() },
-			)),
-			Conversion::Sub { sub_token, by } => Some(Self(
-				output_unit.clone(),
-				input_unit.clone(),
-				Conversion::Add { add_token: kw::add(sub_token.span), by: by.clone() },
-			)),
-			Conversion::Fun { .. } => None,
+impl Table {
+	fn conversions(self) -> ConversionTable2 {
+		let mut explicits = Vec::new();
+		let mut implicits = Vec::new();
+		for (explicit, implicit) in self.rows.into_iter().flat_map(Row::into_iter) {
+			explicits.extend(explicit);
+			implicits.extend(implicit);
 		}
+		ConversionTable2 { explicits, implicits }
 	}
 }
+
+type ExplicitImplicitConversionPair = (Option<ConcreteConversion2>, Option<ConcreteConversion2>);
 
 struct RowsIterator(Box<dyn Iterator<Item = ExplicitImplicitConversionPair>>);
 
@@ -352,23 +357,6 @@ impl IntoIterator for DerivedRow {
 		RowIterator(Box::new(self.units.into_iter().flat_map(move |unit| {
 			self.derivation.multipliers().flat_map(move |multiplier| Self::derive(&unit, multiplier))
 		})))
-	}
-}
-
-struct ConversionTable2 {
-	explicits: Vec<ConcreteConversion2>,
-	implicits: Vec<ConcreteConversion2>,
-}
-
-impl Table {
-	fn conversions(self) -> ConversionTable2 {
-		let mut explicits = Vec::new();
-		let mut implicits = Vec::new();
-		for (explicit, implicit) in self.rows.into_iter().flat_map(Row::into_iter) {
-			explicits.extend(explicit);
-			implicits.extend(implicit);
-		}
-		ConversionTable2 { explicits, implicits }
 	}
 }
 
