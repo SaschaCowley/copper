@@ -7,8 +7,7 @@ impl Multiplier {
 	pub(crate) fn symbols(&self) -> &[&'static str] {
 		self.1
 	}
-	#[allow(dead_code)]
-	fn factor(&self) -> f64 {
+	pub(crate) fn factor(&self) -> f64 {
 		self.2
 	}
 }

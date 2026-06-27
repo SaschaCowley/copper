@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, iter::once};
 
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::{
 	Ident, Path, Token, braced, parenthesized,
@@ -10,7 +10,10 @@ use syn::{
 	token,
 };
 
-use crate::kw;
+use crate::{
+	kw,
+	multipliers::{DATA_METRIC_MULTIPLIERS, IEC_MULTIPLIERS, Multiplier, NONDATA_METRIC_MULTIPLIERS},
+};
 
 #[derive(Clone, Debug)]
 struct Unit {
@@ -273,46 +276,72 @@ pub(crate) fn make_table_impl(input: proc_macro::TokenStream) -> proc_macro::Tok
 	proc_macro::TokenStream::from(expanded)
 }
 
-struct Output {
+struct SingleOutput {
 	unit: Ident,
 	arrow_token: Token!(=>),
 	conversion: Conversion,
 }
 
-impl Parse for Output {
+impl Parse for SingleOutput {
 	fn parse(input: ParseStream) -> Result<Self> {
 		Ok(Self { unit: input.parse()?, arrow_token: input.parse()?, conversion: input.parse()? })
 	}
 }
 
-struct SimpleRow {
+struct MultipleOutputs {
+	brace_token: token::Brace,
+	outputs: Punctuated<SingleOutput, Token!(,)>,
+}
+
+impl Parse for MultipleOutputs {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let content;
+		Ok(Self { brace_token: braced!(content in input), outputs: content.call(Punctuated::parse_terminated)? })
+	}
+}
+
+enum Output {
+	Single(SingleOutput),
+	Multiple(MultipleOutputs),
+}
+
+impl Parse for Output {
+	fn parse(input: ParseStream) -> Result<Self> {
+		if input.peek(token::Brace) { input.parse().map(Self::Multiple) } else { input.parse().map(Self::Single) }
+	}
+}
+
+struct OutputIterator(Box<dyn Iterator<Item = SingleOutput>>);
+
+impl Iterator for OutputIterator {
+	type Item = SingleOutput;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0.next()
+	}
+}
+
+impl IntoIterator for Output {
+	type Item = SingleOutput;
+	type IntoIter = OutputIterator;
+
+	fn into_iter(self) -> Self::IntoIter {
+		match self {
+			Self::Single(o) => OutputIterator(Box::new(once(o))),
+			Self::Multiple(o) => OutputIterator(Box::new(o.outputs.into_iter())),
+		}
+	}
+}
+
+struct ExplicitRow {
 	input_unit: Ident,
 	fat_arrow_token: Token!(->),
 	output: Output,
 }
 
-impl Parse for SimpleRow {
+impl Parse for ExplicitRow {
 	fn parse(input: ParseStream) -> Result<Self> {
 		Ok(Self { input_unit: input.parse()?, fat_arrow_token: input.parse()?, output: input.parse()? })
-	}
-}
-
-struct CompositeRow {
-	input_unit: Ident,
-	fat_arrow_token: Token!(->),
-	brace_token: token::Brace,
-	outputs: Punctuated<Output, Token!(,)>,
-}
-
-impl Parse for CompositeRow {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let content;
-		Ok(Self {
-			input_unit: input.parse()?,
-			fat_arrow_token: input.parse()?,
-			brace_token: braced!(content in input),
-			outputs: content.call(Punctuated::parse_terminated)?,
-		})
 	}
 }
 
@@ -334,10 +363,19 @@ impl Parse for Derivation {
 	}
 }
 
+impl Derivation {
+	fn multipliers(&self) -> Box<dyn Iterator<Item = &Multiplier> + '_> {
+		match self {
+			Self::Metric(_) => Box::new(DATA_METRIC_MULTIPLIERS.iter().chain(NONDATA_METRIC_MULTIPLIERS.iter())),
+			Self::Data(_) => Box::new(DATA_METRIC_MULTIPLIERS.iter().chain(IEC_MULTIPLIERS.iter())),
+		}
+	}
+}
+
 struct DerivedRow {
 	derivation: Derivation,
 	paren_token: token::Paren,
-	idents: Punctuated<Ident, Token![,]>,
+	units: Punctuated<Ident, Token![,]>,
 }
 
 impl Parse for DerivedRow {
@@ -346,20 +384,27 @@ impl Parse for DerivedRow {
 		Ok(Self {
 			derivation: input.parse()?,
 			paren_token: parenthesized!(content in input),
-			idents: content.call(Punctuated::parse_terminated)?,
+			units: content.call(Punctuated::parse_terminated)?,
 		})
 	}
 }
 
+impl DerivedRow {
+	fn derive(name: Ident, multiplier: Multiplier) -> ConcreteConversion2 {
+		let f = multiplier.factor();
+		Conversion::Mul { mul_token: kw::mul(Span::call_site()), by: Literal::f64_suffixed(f).into() };
+		unimplemented!();
+	}
+}
+
 enum Row {
-	Simple(SimpleRow),
-	Composite(CompositeRow),
+	Explicit(ExplicitRow),
 	Derived(DerivedRow),
 }
 
 impl Parse for Row {
 	fn parse(input: ParseStream) -> Result<Self> {
-		unimplemented!();
+		if input.peek2(token::Paren) { input.parse().map(Self::Derived) } else { input.parse().map(Self::Explicit) }
 	}
 }
 
@@ -379,5 +424,13 @@ impl Parse for Table {
 			brace_token: braced!(content in input),
 			rows: content.call(Punctuated::parse_terminated)?,
 		})
+	}
+}
+
+struct ConcreteConversion2(Ident, Ident, Conversion);
+
+impl ExplicitRow {
+	fn thing(self) {
+		self.output.into_iter().map(|o| ConcreteConversion2(self.input_unit.clone(), o.unit, o.conversion));
 	}
 }
