@@ -4,7 +4,7 @@ use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::{
 	Ident, Path, Token, braced, parenthesized,
-	parse::{Parse, ParseStream, Result},
+	parse::{self, Parse, ParseStream, Result},
 	parse_macro_input,
 	punctuated::Punctuated,
 	token,
@@ -13,6 +13,7 @@ use syn::{
 use crate::{
 	kw,
 	multipliers::{DATA_METRIC_MULTIPLIERS, IEC_MULTIPLIERS, Multiplier, NONDATA_METRIC_MULTIPLIERS},
+	names::multiply_ident,
 };
 
 #[derive(Clone, Debug)]
@@ -345,6 +346,7 @@ impl Parse for ExplicitRow {
 	}
 }
 
+#[derive(Clone)]
 enum Derivation {
 	Metric(kw::metric),
 	Data(kw::data),
@@ -364,7 +366,7 @@ impl Parse for Derivation {
 }
 
 impl Derivation {
-	fn multipliers(&self) -> Box<dyn Iterator<Item = &Multiplier> + '_> {
+	fn multipliers(&self) -> Box<dyn Iterator<Item = &'static Multiplier>> {
 		match self {
 			Self::Metric(_) => Box::new(DATA_METRIC_MULTIPLIERS.iter().chain(NONDATA_METRIC_MULTIPLIERS.iter())),
 			Self::Data(_) => Box::new(DATA_METRIC_MULTIPLIERS.iter().chain(IEC_MULTIPLIERS.iter())),
@@ -390,10 +392,21 @@ impl Parse for DerivedRow {
 }
 
 impl DerivedRow {
-	fn derive(name: Ident, multiplier: Multiplier) -> ConcreteConversion2 {
-		let f = multiplier.factor();
-		Conversion::Mul { mul_token: kw::mul(Span::call_site()), by: Literal::f64_suffixed(f).into() };
-		unimplemented!();
+	fn derive(base: &Ident, multiplier: &Multiplier) -> [ConcreteConversion2; 2] {
+		let derived = multiply_ident(base, multiplier.name());
+		let factor: TokenTree = Literal::f64_suffixed(multiplier.factor()).into();
+		[
+			ConcreteConversion2(
+				derived.clone(),
+				base.clone(),
+				Conversion::Mul { mul_token: kw::mul(Span::call_site()), by: factor.clone() },
+			),
+			ConcreteConversion2(
+				base.clone(),
+				derived,
+				Conversion::Div { div_token: kw::div(Span::call_site()), by: factor },
+			),
+		]
 	}
 }
 
@@ -428,9 +441,87 @@ impl Parse for Table {
 }
 
 struct ConcreteConversion2(Ident, Ident, Conversion);
+type ExplicitImplicitConversionPair = (Option<ConcreteConversion2>, Option<ConcreteConversion2>);
 
-impl ExplicitRow {
-	fn thing(self) {
-		self.output.into_iter().map(|o| ConcreteConversion2(self.input_unit.clone(), o.unit, o.conversion));
+impl ConcreteConversion2 {
+	fn inverse(&self) -> Option<Self> {
+		let Self(input_unit, output_unit, conversion) = self;
+		match conversion {
+			Conversion::Mul { mul_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Div { div_token: kw::div(mul_token.span), by: by.clone() },
+			)),
+			Conversion::Div { div_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Mul { mul_token: kw::mul(div_token.span), by: by.clone() },
+			)),
+			Conversion::Add { add_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Sub { sub_token: kw::sub(add_token.span), by: by.clone() },
+			)),
+			Conversion::Sub { sub_token, by } => Some(Self(
+				output_unit.clone(),
+				input_unit.clone(),
+				Conversion::Add { add_token: kw::add(sub_token.span), by: by.clone() },
+			)),
+			Conversion::Fun { .. } => None,
+		}
+	}
+}
+
+struct RowsIterator(Box<dyn Iterator<Item = ExplicitImplicitConversionPair>>);
+
+impl Iterator for RowsIterator {
+	type Item = ExplicitImplicitConversionPair;
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0.next()
+	}
+}
+
+impl IntoIterator for Row {
+	type Item = ExplicitImplicitConversionPair;
+	type IntoIter = RowsIterator;
+
+	fn into_iter(self) -> Self::IntoIter {
+		match self {
+			Self::Explicit(row) => RowsIterator(Box::new(row.into_iter().map(|row| {
+				let inverse = row.inverse();
+				(Some(row), inverse)
+			}))),
+			Self::Derived(row) => RowsIterator(Box::new(row.into_iter().map(|row| (None, Some(row))))),
+		}
+	}
+}
+
+struct RowIterator(Box<dyn Iterator<Item = ConcreteConversion2>>);
+impl Iterator for RowIterator {
+	type Item = ConcreteConversion2;
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0.next()
+	}
+}
+
+impl IntoIterator for ExplicitRow {
+	type Item = ConcreteConversion2;
+	type IntoIter = RowIterator;
+
+	fn into_iter(self) -> Self::IntoIter {
+		RowIterator(Box::new(
+			self.output.into_iter().map(move |o| ConcreteConversion2(self.input_unit.clone(), o.unit, o.conversion)),
+		))
+	}
+}
+
+impl IntoIterator for DerivedRow {
+	type Item = ConcreteConversion2;
+	type IntoIter = RowIterator;
+
+	fn into_iter(self) -> Self::IntoIter {
+		RowIterator(Box::new(self.units.into_iter().flat_map(move |unit| {
+			self.derivation.multipliers().flat_map(move |multiplier| Self::derive(&unit, multiplier))
+		})))
 	}
 }

@@ -12,12 +12,8 @@ use syn::{
 use crate::{
 	kw,
 	multipliers::{DATA_METRIC_MULTIPLIERS, IEC_MULTIPLIERS, Multiplier, NONDATA_METRIC_MULTIPLIERS},
+	names::{multiply_ident, name_to_ident},
 };
-
-fn name_to_ident(name: &str) -> String {
-	let mut chars = name.chars();
-	chars.next().map_or_else(String::new, |c| c.to_uppercase().chain(chars).collect())
-}
 
 struct IdentAndName(Ident, Token!(,), LitStr);
 
@@ -113,10 +109,7 @@ impl CompositeUnit {
 	fn multiply(&self, multiplier: &Multiplier) -> SingleUnit {
 		SingleUnit {
 			paren_token: self.paren_token,
-			ident: Ident::new(
-				&name_to_ident(&(multiplier.name().to_owned() + &self.ident.to_string().to_lowercase())),
-				self.ident.span(),
-			),
+			ident: multiply_ident(&self.ident, multiplier.name()),
 			comma_token1: self.comma_token1,
 			name: LitStr::new(&(multiplier.name().to_owned() + &self.name.value()), self.name.span()),
 			comma_token2: self.comma_token2,
