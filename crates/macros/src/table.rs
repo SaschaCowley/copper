@@ -16,6 +16,16 @@ use crate::{
 	names::multiply_ident,
 };
 
+struct DynIterator<T>(Box<dyn Iterator<Item = T>>);
+
+impl<T> Iterator for DynIterator<T> {
+	type Item = T;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0.next()
+	}
+}
+
 enum Conversion {
 	Mul {
 		mul_token: kw::mul,
@@ -151,24 +161,14 @@ impl Parse for Output {
 	}
 }
 
-struct OutputIterator(Box<dyn Iterator<Item = SingleOutput>>);
-
-impl Iterator for OutputIterator {
-	type Item = SingleOutput;
-
-	fn next(&mut self) -> Option<Self::Item> {
-		self.0.next()
-	}
-}
-
 impl IntoIterator for Output {
 	type Item = SingleOutput;
-	type IntoIter = OutputIterator;
+	type IntoIter = DynIterator<Self::Item>;
 
 	fn into_iter(self) -> Self::IntoIter {
 		match self {
-			Self::Single(o) => OutputIterator(Box::new(once(o))),
-			Self::Multiple(o) => OutputIterator(Box::new(o.outputs.into_iter())),
+			Self::Single(o) => DynIterator(Box::new(once(o))),
+			Self::Multiple(o) => DynIterator(Box::new(o.outputs.into_iter())),
 		}
 	}
 }
@@ -183,6 +183,17 @@ struct ExplicitRow {
 impl Parse for ExplicitRow {
 	fn parse(input: ParseStream) -> Result<Self> {
 		Ok(Self { input_unit: input.parse()?, arrow_token: input.parse()?, output: input.parse()? })
+	}
+}
+
+impl IntoIterator for ExplicitRow {
+	type Item = ConcreteConversion;
+	type IntoIter = DynIterator<Self::Item>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		DynIterator(Box::new(
+			self.output.into_iter().map(move |o| ConcreteConversion(self.input_unit.clone(), o.unit, o.conversion)),
+		))
 	}
 }
 
@@ -221,17 +232,6 @@ struct DerivedRow {
 	units: Punctuated<Ident, Token![,]>,
 }
 
-impl Parse for DerivedRow {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let content;
-		Ok(Self {
-			derivation: input.parse()?,
-			paren_token: parenthesized!(content in input),
-			units: content.call(Punctuated::parse_terminated)?,
-		})
-	}
-}
-
 impl DerivedRow {
 	fn derive(base: &Ident, multiplier: &Multiplier) -> [ConcreteConversion; 2] {
 		let derived = multiply_ident(base, multiplier.name());
@@ -251,6 +251,28 @@ impl DerivedRow {
 	}
 }
 
+impl Parse for DerivedRow {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let content;
+		Ok(Self {
+			derivation: input.parse()?,
+			paren_token: parenthesized!(content in input),
+			units: content.call(Punctuated::parse_terminated)?,
+		})
+	}
+}
+
+impl IntoIterator for DerivedRow {
+	type Item = ConcreteConversion;
+	type IntoIter = DynIterator<Self::Item>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		DynIterator(Box::new(self.units.into_iter().flat_map(move |unit| {
+			self.derivation.multipliers().flat_map(move |multiplier| Self::derive(&unit, multiplier))
+		})))
+	}
+}
+
 enum Row {
 	Explicit(ExplicitRow),
 	Derived(DerivedRow),
@@ -259,6 +281,23 @@ enum Row {
 impl Parse for Row {
 	fn parse(input: ParseStream) -> Result<Self> {
 		if input.peek2(token::Paren) { input.parse().map(Self::Derived) } else { input.parse().map(Self::Explicit) }
+	}
+}
+
+type ExplicitImplicitConversionPair = (Option<ConcreteConversion>, Option<ConcreteConversion>);
+
+impl IntoIterator for Row {
+	type Item = ExplicitImplicitConversionPair;
+	type IntoIter = DynIterator<Self::Item>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		match self {
+			Self::Explicit(row) => DynIterator(Box::new(row.into_iter().map(|row| {
+				let inverse = row.inverse();
+				(Some(row), inverse)
+			}))),
+			Self::Derived(row) => DynIterator(Box::new(row.into_iter().map(|row| (None, Some(row))))),
+		}
 	}
 }
 
@@ -304,62 +343,6 @@ impl Table {
 	}
 }
 
-type ExplicitImplicitConversionPair = (Option<ConcreteConversion>, Option<ConcreteConversion>);
-
-struct RowsIterator(Box<dyn Iterator<Item = ExplicitImplicitConversionPair>>);
-
-impl Iterator for RowsIterator {
-	type Item = ExplicitImplicitConversionPair;
-	fn next(&mut self) -> Option<Self::Item> {
-		self.0.next()
-	}
-}
-
-impl IntoIterator for Row {
-	type Item = ExplicitImplicitConversionPair;
-	type IntoIter = RowsIterator;
-
-	fn into_iter(self) -> Self::IntoIter {
-		match self {
-			Self::Explicit(row) => RowsIterator(Box::new(row.into_iter().map(|row| {
-				let inverse = row.inverse();
-				(Some(row), inverse)
-			}))),
-			Self::Derived(row) => RowsIterator(Box::new(row.into_iter().map(|row| (None, Some(row))))),
-		}
-	}
-}
-
-struct RowIterator(Box<dyn Iterator<Item = ConcreteConversion>>);
-impl Iterator for RowIterator {
-	type Item = ConcreteConversion;
-	fn next(&mut self) -> Option<Self::Item> {
-		self.0.next()
-	}
-}
-
-impl IntoIterator for ExplicitRow {
-	type Item = ConcreteConversion;
-	type IntoIter = RowIterator;
-
-	fn into_iter(self) -> Self::IntoIter {
-		RowIterator(Box::new(
-			self.output.into_iter().map(move |o| ConcreteConversion(self.input_unit.clone(), o.unit, o.conversion)),
-		))
-	}
-}
-
-impl IntoIterator for DerivedRow {
-	type Item = ConcreteConversion;
-	type IntoIter = RowIterator;
-
-	fn into_iter(self) -> Self::IntoIter {
-		RowIterator(Box::new(self.units.into_iter().flat_map(move |unit| {
-			self.derivation.multipliers().flat_map(move |multiplier| Self::derive(&unit, multiplier))
-		})))
-	}
-}
-
 pub(crate) fn make_table_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let table = parse_macro_input!(input as Table);
 	let vis = table.vis.clone();
@@ -381,12 +364,10 @@ pub(crate) fn make_table_impl(input: proc_macro::TokenStream) -> proc_macro::Tok
 		}
 		branches.push(quote! {(#origin::#input_unit, ::std::collections::HashMap::from([#(#leaves),*]))});
 	}
-	// let expanded = quote! {HashMap::from([#(#branches),*])};
 	let expanded = quote! {
 		#vis static #name: ::std::sync::LazyLock<::std::collections::HashMap<#origin, ::std::collections::HashMap<#origin, #conv_ty>>> = ::std::sync::LazyLock::new(|| {
 			::std::collections::HashMap::from([#(#branches),*])
 		});
 	};
-	// let expanded = quote!{};
 	proc_macro::TokenStream::from(expanded)
 }
