@@ -78,9 +78,9 @@ impl ToTokens for Conversion {
 	}
 }
 
-struct ConcreteConversion2(Ident, Ident, Conversion);
+struct ConcreteConversion(Ident, Ident, Conversion);
 
-impl ConcreteConversion2 {
+impl ConcreteConversion {
 	fn inverse(&self) -> Option<Self> {
 		let Self(input_unit, output_unit, conversion) = self;
 		match conversion {
@@ -109,9 +109,9 @@ impl ConcreteConversion2 {
 	}
 }
 
-struct ConversionTable2 {
-	explicits: Vec<ConcreteConversion2>,
-	implicits: Vec<ConcreteConversion2>,
+struct ConversionTable {
+	explicits: Vec<ConcreteConversion>,
+	implicits: Vec<ConcreteConversion>,
 }
 
 struct SingleOutput {
@@ -233,16 +233,16 @@ impl Parse for DerivedRow {
 }
 
 impl DerivedRow {
-	fn derive(base: &Ident, multiplier: &Multiplier) -> [ConcreteConversion2; 2] {
+	fn derive(base: &Ident, multiplier: &Multiplier) -> [ConcreteConversion; 2] {
 		let derived = multiply_ident(base, multiplier.name());
 		let factor: TokenTree = Literal::f64_suffixed(multiplier.factor()).into();
 		[
-			ConcreteConversion2(
+			ConcreteConversion(
 				derived.clone(),
 				base.clone(),
 				Conversion::Mul { mul_token: kw::mul(Span::call_site()), by: factor.clone() },
 			),
-			ConcreteConversion2(
+			ConcreteConversion(
 				base.clone(),
 				derived,
 				Conversion::Div { div_token: kw::div(Span::call_site()), by: factor },
@@ -293,18 +293,18 @@ impl Parse for Table {
 }
 
 impl Table {
-	fn conversions(self) -> ConversionTable2 {
+	fn conversions(self) -> ConversionTable {
 		let mut explicits = Vec::new();
 		let mut implicits = Vec::new();
 		for (explicit, implicit) in self.rows.into_iter().flat_map(Row::into_iter) {
 			explicits.extend(explicit);
 			implicits.extend(implicit);
 		}
-		ConversionTable2 { explicits, implicits }
+		ConversionTable { explicits, implicits }
 	}
 }
 
-type ExplicitImplicitConversionPair = (Option<ConcreteConversion2>, Option<ConcreteConversion2>);
+type ExplicitImplicitConversionPair = (Option<ConcreteConversion>, Option<ConcreteConversion>);
 
 struct RowsIterator(Box<dyn Iterator<Item = ExplicitImplicitConversionPair>>);
 
@@ -330,27 +330,27 @@ impl IntoIterator for Row {
 	}
 }
 
-struct RowIterator(Box<dyn Iterator<Item = ConcreteConversion2>>);
+struct RowIterator(Box<dyn Iterator<Item = ConcreteConversion>>);
 impl Iterator for RowIterator {
-	type Item = ConcreteConversion2;
+	type Item = ConcreteConversion;
 	fn next(&mut self) -> Option<Self::Item> {
 		self.0.next()
 	}
 }
 
 impl IntoIterator for ExplicitRow {
-	type Item = ConcreteConversion2;
+	type Item = ConcreteConversion;
 	type IntoIter = RowIterator;
 
 	fn into_iter(self) -> Self::IntoIter {
 		RowIterator(Box::new(
-			self.output.into_iter().map(move |o| ConcreteConversion2(self.input_unit.clone(), o.unit, o.conversion)),
+			self.output.into_iter().map(move |o| ConcreteConversion(self.input_unit.clone(), o.unit, o.conversion)),
 		))
 	}
 }
 
 impl IntoIterator for DerivedRow {
-	type Item = ConcreteConversion2;
+	type Item = ConcreteConversion;
 	type IntoIter = RowIterator;
 
 	fn into_iter(self) -> Self::IntoIter {
@@ -360,7 +360,7 @@ impl IntoIterator for DerivedRow {
 	}
 }
 
-pub(crate) fn make_table_impl2(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub(crate) fn make_table_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let table = parse_macro_input!(input as Table);
 	let vis = table.vis.clone();
 	let name = table.name.clone();
@@ -368,7 +368,7 @@ pub(crate) fn make_table_impl2(input: proc_macro::TokenStream) -> proc_macro::To
 	let conv_ty = table.conv_ty.clone();
 	let mut tree: HashMap<Ident, HashMap<Ident, Conversion>> = HashMap::new();
 	let mut conversions = table.conversions();
-	for ConcreteConversion2(input_unit, output_unit, conversion) in
+	for ConcreteConversion(input_unit, output_unit, conversion) in
 		conversions.implicits.drain(..).chain(conversions.explicits.drain(..))
 	{
 		tree.entry(input_unit).or_default().insert(output_unit, conversion);

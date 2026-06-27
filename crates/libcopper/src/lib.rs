@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 
-use copper_macros::{declare_units, make_table2};
+use copper_macros::{declare_units, make_table};
 use log::debug;
 use thiserror::Error;
 
@@ -39,7 +39,7 @@ declare_units! {
 
 type ConversionFunc = fn(f64) -> f64;
 
-make_table2! {
+make_table! {
 	pub CONVERSIONS<ConversionFunc> Unit {
 		data(Bit, Byte),
 		metric(Metre),
