@@ -215,6 +215,7 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 	let mut enum_vars = Vec::new();
 	let mut name_arms = Vec::new();
 	let mut plural_arms = Vec::new();
+	let mut symbols_arms = Vec::new();
 	let mut symbol_arms = Vec::new();
 	let mut parse_arms = Vec::new();
 	for unit in input.expand() {
@@ -223,7 +224,9 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 		name_arms.push(quote! {Self::#ident => #name});
 		plural_arms.push(quote! {Self::#ident => #plural});
 		let symbols = symbols.iter().clone().collect::<Vec<&LitStr>>();
-		symbol_arms.push(quote! {Self::#ident => &[#(#symbols),*]});
+		let symbol = symbols[0];
+		symbols_arms.push(quote! {Self::#ident => &[#(#symbols),*]});
+		symbol_arms.push(quote! {Self::#ident => #symbol});
 		parse_arms.push(quote! {#(#symbols)|* => Ok(Self::#ident)});
 	}
 	let UnitDecls { vis, ident, .. } = input;
@@ -247,6 +250,12 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 			}
 
 			pub fn symbols(&self) -> &[&'static str] {
+				match self {
+					#(#symbols_arms),*
+				}
+			}
+
+			pub fn symbol(&self) -> &'static str {
 				match self {
 					#(#symbol_arms),*
 				}

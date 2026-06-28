@@ -6,7 +6,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug, Clone, Eq, PartialEq)]
 pub enum ConversionError {
-	#[error("Cannot convert from {from} to {to}: no conversion path found.")]
+	#[error("Cannot convert from {} to {}: no conversion path found.", from.plural(), to.plural())]
 	IncompatibleUnits { from: Unit, to: Unit },
 }
 
@@ -74,7 +74,7 @@ fn apply_conversion(amount: f64, conversion_path: Vec<Unit>) -> f64 {
 		let input_unit = conversion_path[i];
 		let output_unit = conversion_path[i + 1];
 		let new_amount = CONVERSIONS[&input_unit][&output_unit](amount);
-		debug!("{amount}{input_unit} = {new_amount}{output_unit}");
+		debug!("{amount}{} = {new_amount}{}", input_unit.symbol(), output_unit.symbol());
 		amount = new_amount;
 	}
 	amount
