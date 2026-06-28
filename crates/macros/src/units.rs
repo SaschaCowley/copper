@@ -218,7 +218,10 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 	let mut symbols_arms = Vec::new();
 	let mut symbol_arms = Vec::new();
 	let mut parse_arms = Vec::new();
-	for unit in input.expand() {
+	let mut iter_arms = Vec::new();
+	let vis = input.vis.clone();
+	let enum_ident = input.ident.clone();
+	for (index, unit) in input.expand().into_iter().enumerate() {
 		let SingleUnit { ident, name, plural, symbols, .. } = unit;
 		enum_vars.push(ident.clone());
 		name_arms.push(quote! {Self::#ident => #name});
@@ -228,8 +231,10 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 		symbols_arms.push(quote! {Self::#ident => &[#(#symbols),*]});
 		symbol_arms.push(quote! {Self::#ident => #symbol});
 		parse_arms.push(quote! {#(#symbols)|* => Ok(Self::#ident)});
+		iter_arms.push(quote! {#index => std::option::Option::Some(#enum_ident::#ident)});
 	}
-	let UnitDecls { vis, ident, .. } = input;
+	let ident = enum_ident;
+	let iter_ident = format_ident!("{}Iter", ident);
 	let expanded = quote! {
 		#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 		#vis enum #ident {
@@ -276,6 +281,27 @@ pub(crate) fn declare_units_impl(tokens: proc_macro::TokenStream) -> proc_macro:
 		impl std::fmt::Display for #ident {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 				f.write_str(self.name())
+			}
+		}
+
+		#vis struct #iter_ident(usize);
+
+		impl std::iter::Iterator for #iter_ident {
+			type Item = #ident;
+
+			fn next(&mut self) -> std::option::Option<Self::Item> {
+				let variant = match self.0 {
+					#(#iter_arms),*,
+					_ => None,
+				};
+				if variant.is_some() { self.0 += 1; }
+				variant
+			}
+		}
+
+		impl #ident {
+			pub fn iter() -> #iter_ident {
+				#iter_ident(0)
 			}
 		}
 	};

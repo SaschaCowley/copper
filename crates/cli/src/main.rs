@@ -1,13 +1,25 @@
 use std::io::Write;
 
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Args, Parser};
 use libcopper::{Unit, do_conversion};
 use log::{LevelFilter, info};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
+	#[command(flatten)]
+	convert: Option<Convert>,
+	/// Output verbosity
+	#[arg(short, long, action = clap::ArgAction::Count)]
+	verbosity: u8,
+	/// List supported units
+	#[arg(short, long, conflicts_with = "Convert")]
+	list: bool,
+}
+
+#[derive(Args)]
+struct Convert {
 	/// Quantity to convert
 	quantity: f64,
 	/// Input unit
@@ -16,9 +28,6 @@ struct Cli {
 	/// Output unit
 	#[arg(id = "TO")]
 	output_unit: Unit,
-	/// Output verbosity
-	#[arg(short, long, action = clap::ArgAction::Count)]
-	verbosity: u8,
 }
 
 fn main() -> Result<()> {
@@ -34,18 +43,30 @@ fn main() -> Result<()> {
 		)
 		.format(|buf, record| writeln!(buf, "{}", record.args()))
 		.init();
-	info!(
-		"Converting {} {} to {}",
-		cli.quantity,
-		if cli.quantity == 1.0 { cli.input_unit.name() } else { cli.input_unit.plural() },
-		cli.output_unit.plural()
-	);
-	let result = do_conversion(cli.quantity, cli.input_unit, cli.output_unit)
-		.with_context(|| format!("Failed to convert {}{} to {}", cli.quantity, cli.input_unit, cli.output_unit))?;
-	if cli.verbosity == 0 {
-		println!("{result}");
+	if cli.list {
+		list_units();
 	} else {
-		println!("{}{} = {}{}", cli.quantity, cli.input_unit.symbol(), result, cli.output_unit.symbol());
+		let Convert { quantity, input_unit, output_unit } = cli.convert.with_context(|| "No conversion specified")?;
+		info!(
+			"Converting {} {} to {}",
+			quantity,
+			if quantity == 1.0 { input_unit.name() } else { input_unit.plural() },
+			output_unit.plural()
+		);
+		let result = do_conversion(quantity, input_unit, output_unit)
+			.with_context(|| format!("Failed to convert {}{} to {}", quantity, input_unit, output_unit))?;
+		if cli.verbosity == 0 {
+			println!("{result}");
+		} else {
+			println!("{}{} = {}{}", quantity, input_unit.symbol(), result, output_unit.symbol());
+		}
 	}
 	Ok(())
+}
+
+fn list_units() {
+	println!("Supported units:");
+	for unit in Unit::iter() {
+		println!("{} ({})", unit.plural(), unit.symbols().join(", "));
+	}
 }
