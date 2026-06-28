@@ -34,13 +34,18 @@ fn main() -> Result<()> {
 		)
 		.format(|buf, record| writeln!(buf, "{}", record.args()))
 		.init();
-	info!("Converting {}{} to {}", cli.quantity, cli.input_unit, cli.output_unit);
+	info!(
+		"Converting {} {} to {}",
+		cli.quantity,
+		if cli.quantity == 1.0 { cli.input_unit.name() } else { cli.input_unit.plural() },
+		cli.output_unit.plural()
+	);
 	let result = do_conversion(cli.quantity, cli.input_unit, cli.output_unit)
 		.with_context(|| format!("Failed to convert {}{} to {}", cli.quantity, cli.input_unit, cli.output_unit))?;
 	if cli.verbosity == 0 {
 		println!("{result}");
 	} else {
-		println!("{}{} = {}{}", cli.quantity, cli.input_unit, result, cli.output_unit);
+		println!("{}{} = {}{}", cli.quantity, cli.input_unit.symbol(), result, cli.output_unit.symbol());
 	}
 	Ok(())
 }
