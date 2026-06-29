@@ -3,7 +3,9 @@ use std::{collections::HashMap, iter::once};
 use proc_macro2::{Literal, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::{
-	Ident, Path, Token, Visibility, braced, parenthesized,
+	Ident, Path, Token, Visibility, braced,
+	ext::IdentExt,
+	parenthesized,
 	parse::{Parse, ParseStream, Result},
 	parse_macro_input,
 	punctuated::Punctuated,
@@ -301,6 +303,51 @@ impl IntoIterator for Row {
 	}
 }
 
+#[derive(Clone)]
+struct EnumPath {
+	leading_colon: Option<Token![::]>,
+	segments: Punctuated<Ident, Token![::]>,
+	#[allow(dead_code)]
+	trailing_colon: Token![::],
+}
+
+impl Parse for EnumPath {
+	fn parse(input: ParseStream) -> Result<Self> {
+		Ok(Self {
+			leading_colon: input.parse()?,
+			segments: {
+				let mut segments = Punctuated::new();
+				loop {
+					if !input.peek(Ident)
+						&& !input.peek(Token![self])
+						&& !input.peek(Token![super])
+						&& !input.peek(Token![crate])
+					{
+						break;
+					}
+					segments.push_value(Ident::parse_any(input)?);
+					if input.peek3(token::Brace) {
+						break;
+					}
+					segments.push_punct(input.parse()?);
+				}
+				if segments.is_empty() {
+					return Err(input.parse::<Ident>().unwrap_err());
+				}
+				segments
+			},
+			trailing_colon: input.parse()?,
+		})
+	}
+}
+
+impl ToTokens for EnumPath {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
+		self.leading_colon.to_tokens(tokens);
+		self.segments.to_tokens(tokens);
+	}
+}
+
 struct Table {
 	vis: Visibility,
 	name: Ident,
@@ -309,7 +356,9 @@ struct Table {
 	conv_ty: Path,
 	#[allow(dead_code)]
 	gt_token: Token!(>),
-	origin: Path,
+	#[allow(dead_code)]
+	eq_token: Token![=],
+	origin: EnumPath,
 	#[allow(dead_code)]
 	brace_token: token::Brace,
 	rows: Punctuated<Row, Token!(,)>,
@@ -324,7 +373,8 @@ impl Parse for Table {
 			lt_token: input.parse()?,
 			conv_ty: input.parse()?,
 			gt_token: input.parse()?,
-			origin: Path::parse_mod_style(input)?,
+			eq_token: input.parse()?,
+			origin: input.parse()?,
 			brace_token: braced!(content in input),
 			rows: content.call(Punctuated::parse_terminated)?,
 		})

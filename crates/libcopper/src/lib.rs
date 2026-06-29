@@ -40,7 +40,7 @@ declare_units! {
 type ConversionFunc = fn(f64) -> f64;
 
 make_table! {
-	pub CONVERSIONS<ConversionFunc> Unit {
+	pub CONVERSIONS<ConversionFunc> = Unit::{
 		data(Bit, Byte),
 		metric(Metre),
 		Metre -> Yard => div 0.9144,
