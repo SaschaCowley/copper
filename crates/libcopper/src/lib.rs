@@ -25,6 +25,14 @@ declare_units! {
 		("yard", "yards", "yd"),
 		("mile", "miles", "mi"),
 
+		// Weight
+		metric("gram", "grams", "g"),
+		("grain", "grains", "gr"),
+		("ounce", "ounces", "oz"),
+		("pound", "pounds", "lb"),
+		("dram", "drams", "dr"),
+		("stone", "stone", "st"),
+
 		// Data
 		data("byte", "bytes", "B"),
 		data("bit", "bits", "b"),
@@ -42,12 +50,19 @@ type ConversionFunc = fn(f64) -> f64;
 make_table! {
 	pub CONVERSIONS<ConversionFunc> = Unit::{
 		data(Bit, Byte),
-		metric(Metre),
+		metric(Metre, Gram),
 		Metre -> Yard => div 0.9144,
 		Yard -> {
 			Inch => mul 36.0,
 			Foot =>  mul 3.0,
 			Mile =>  div 1760.0,
+		},
+		Kilogram -> Pound => div 0.45359237,
+		Pound -> {
+			Grain => mul 7000.0,
+			Dram => mul 256.0,
+			Ounce => mul 16.0,
+			Stone => div 14.0,
 		},
 		Celsius -> {
 			Kelvin => add 273.15,
